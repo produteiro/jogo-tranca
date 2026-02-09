@@ -1,7 +1,6 @@
 {
   "name": "tranca-royale",
-  "version": "1.1.0",
-  "description": "Jogo de Tranca Online para jogotranca.com.br",
+  "version": "1.2.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
