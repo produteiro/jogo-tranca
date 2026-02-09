@@ -1,13 +1,10 @@
-// Substitua a linha antiga por esta:
-const socket = io(); 
-// Como hospedaremos tudo no mesmo lugar, ele detecta o endereço automaticamente.
-
-//let userId = localStorage.getItem('tranca_userId');
+let userId = localStorage.getItem('tranca_userId');
 if (!userId) {
     userId = 'user_' + Math.random().toString(36).substr(2, 9);
     localStorage.setItem('tranca_userId', userId);
 }
 
+// AQUI ESTAVA O PROBLEMA: Esta linha deve aparecer apenas UMA vez
 const socket = io(); 
 
 let meuIdNoJogo = null;
@@ -273,7 +270,6 @@ function adicionarTresVermelhoNaMesa(idJogador, c) {
 
 function comprarDoMonte() { 
     if (vezAtual === meuIdNoJogo && estadoTurno === 'comprando') {
-        ultimaOrigemCompra = 'monte'; 
         socket.emit('comprarCarta'); 
     } else {
         const m = document.getElementById('monte');
@@ -290,7 +286,6 @@ function interagirComLixo() {
     if (estadoTurno === 'comprando') {
         const lixo = document.getElementById('lixo');
         if (lixo.classList.contains('trancado')) { alert("Lixo TRANCADO com 3 Preto! Compre do monte."); return; }
-        ultimaOrigemCompra = 'lixo'; 
         socket.emit('comprarLixo', []); 
         cartasSelecionadas = [];
     } else if (estadoTurno === 'descartando') {
