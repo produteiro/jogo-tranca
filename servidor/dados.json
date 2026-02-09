@@ -1,0 +1,36 @@
+{
+  "usuarios": {
+    "tchousp@gmail.com": {
+      "nome": "Teste3",
+      "senha": "senhatchou",
+      "vitorias": 1,
+      "derrotas": 2,
+      "pontos": 120,
+      "premium": false,
+      "dataCadastro": "2026-02-02T12:51:51.379Z"
+    }
+  },
+  "partidas": [
+    {
+      "data": "2026-02-02T16:18:59.950Z",
+      "vencedores": [
+        "tchousp@gmail.com"
+      ],
+      "perdedores": []
+    },
+    {
+      "data": "2026-02-02T16:30:05.833Z",
+      "vencedores": [],
+      "perdedores": [
+        "tchousp@gmail.com"
+      ]
+    },
+    {
+      "data": "2026-02-02T16:30:10.358Z",
+      "vencedores": [],
+      "perdedores": [
+        "tchousp@gmail.com"
+      ]
+    }
+  ]
+}

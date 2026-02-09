@@ -1,0 +1,206 @@
+/* --- RESET E BASE --- */
+* { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+
+body { 
+    background: radial-gradient(circle at center, #1e272e 0%, #000000 100%);
+    color: white; 
+    overflow: hidden; 
+    display: flex; flex-direction: column; align-items: center; 
+    height: 100vh; margin: 0; padding: 0;
+}
+
+/* --- HEADER (NOVO) --- */
+#game-header {
+    position: fixed; top: 0; left: 0; width: 100%; height: 70px;
+    background: rgba(20, 20, 20, 0.95);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 20px;
+    z-index: 2000;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+.header-left .logo { font-size: 18px; font-weight: bold; color: #f1c40f; letter-spacing: 1px; }
+
+.header-center { display: flex; flex-direction: column; align-items: center; }
+
+#placar-integrado { display: flex; align-items: center; gap: 20px; background: rgba(0,0,0,0.3); padding: 5px 25px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.05); }
+.time-score { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.time-score .label { font-size: 10px; color: #aaa; font-weight: bold; letter-spacing: 1px; margin-bottom: 2px; }
+.time-score .score { font-size: 20px; font-weight: bold; }
+.time-score.azul .score { color: #3498db; }
+.time-score.vermelha .score { color: #e74c3c; }
+.vs-divider { color: #555; font-size: 12px; font-weight: bold; }
+
+#info-jogo { font-size: 12px; color: #f1c40f; margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.header-right { display: flex; gap: 10px; align-items: center; }
+.btn-sair { background: rgba(231, 76, 60, 0.2); border: 1px solid rgba(231, 76, 60, 0.5); color: white; padding: 6px 15px; border-radius: 20px; cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: bold; }
+.btn-sair:hover { background: rgba(231, 76, 60, 0.8); }
+#btn-reset { background: transparent; border: 1px solid #555; color: #aaa; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 18px; transition: all 0.2s; }
+#btn-reset:hover { color: white; border-color: white; transform: rotate(180deg); }
+
+/* --- MESA PRINCIPAL --- */
+#mesa { 
+    width: 100%; height: 100%; max-width: 1600px; 
+    display: flex; flex-direction: column; justify-content: center; 
+    position: relative; 
+    padding: 80px 20px 190px 20px; 
+}
+
+/* --- JOGADORES LATERAIS --- */
+.mao-adversario { position: absolute; z-index: 50; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+#mao-esquerda { left: 20px; top: 55%; transform: translateY(-50%); flex-direction: column; width: 80px; } 
+#mao-direita { right: 20px; top: 55%; transform: translateY(-50%); flex-direction: column; width: 80px; }
+#mao-topo { top: 90px; left: 50%; transform: translateX(-50%); flex-direction: row; }
+
+.info-player { 
+    position: absolute; background: #222; padding: 4px 10px; border-radius: 12px; border: 1px solid #444;
+    font-size: 11px; color: #fff; z-index: 60; white-space: nowrap; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+#info-esq { top: -30px; left: 50%; transform: translateX(-50%); }
+#info-dir { top: -30px; left: 50%; transform: translateX(-50%); }
+#info-topo { bottom: -30px; left: 50%; transform: translateX(-50%); }
+
+.carta-miniatura { 
+    width: 45px; height: 65px; border-radius: 4px; border: 1px solid #777; 
+    box-shadow: 1px 1px 4px rgba(0,0,0,0.6); background-color: #2980b9;
+    background-image: url('https://deckofcardsapi.com/static/img/back.png');
+    background-size: cover;
+}
+#mao-esquerda .carta-miniatura, #mao-direita .carta-miniatura { margin: -55px 0; }
+#mao-topo .carta-miniatura { margin: 0 -35px; }
+
+/* --- ÁREAS DE JOGO --- */
+.area-jogos-expostos { 
+    flex: 1; /* Ocupa espaço livre */
+    width: 90%; max-width: 1200px; margin: 10px auto; 
+    background: rgba(255,255,255,0.02); 
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; 
+    display: flex; flex-wrap: wrap; overflow-y: auto; overflow-x: hidden; 
+    gap: 15px; padding: 15px; align-items: center; justify-content: center; 
+    position: relative; z-index: 10; min-height: 120px;
+}
+.area-jogos-expostos::-webkit-scrollbar { width: 6px; }
+.area-jogos-expostos::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+.area-jogos-expostos::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+
+/* --- FAIXA CENTRAL (Mesa) --- */
+.faixa-central { 
+    width: 100%; max-width: 800px; height: 160px; 
+    margin: 10px auto; display: flex; 
+    justify-content: center; align-items: center; 
+    gap: 40px; z-index: 10;
+}
+
+.slot-mesa { display: flex; flex-direction: column; align-items: center; position: relative; }
+.label-mesa { font-size: 10px; color: rgba(255,255,255,0.3); font-weight: bold; margin-bottom: 5px; letter-spacing: 1px; }
+
+#monte { 
+    position: relative; z-index: 100; 
+    width: 90px !important; height: 130px !important;
+    cursor: pointer; transition: transform 0.1s, box-shadow 0.2s; 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+#monte:active { transform: scale(0.95); }
+
+.area-lixo-expandida {
+    width: 200px; height: 140px;
+    border: 2px dashed rgba(255,255,255,0.15);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    position: relative; background: rgba(255,255,255,0.02);
+    transition: background 0.3s; cursor: pointer;
+}
+.area-lixo-expandida:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.3); }
+#lixo .carta { width: 70px !important; height: 100px !important; margin: 0 !important; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+.ativo-brilhando {
+    box-shadow: 0 0 25px #2ecc71 !important;
+    border: 2px solid #2ecc71 !important;
+    animation: pulseVerde 1.5s infinite;
+    cursor: pointer !important;
+}
+@keyframes pulseVerde {
+    0% { transform: scale(1); box-shadow: 0 0 15px #2ecc71; }
+    50% { transform: scale(1.02); box-shadow: 0 0 30px #27ae60; }
+    100% { transform: scale(1); box-shadow: 0 0 15px #2ecc71; }
+}
+
+#area-mortos.morto-container { position: relative; width: 90px; height: 130px; z-index: 5; display: flex; justify-content: center; align-items: center; pointer-events: none; }
+#monte.carta, .pilha-morto { width: 90px !important; height: 130px !important; }
+.pilha-morto { position: absolute; pointer-events: auto; border: 1px solid rgba(255,255,255,0.2); box-shadow: 2px 2px 8px rgba(0,0,0,0.6); }
+.cruzado { transform: rotate(90deg); }
+
+.watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem; font-weight: 900; color: rgba(255,255,255,0.03); pointer-events: none; text-transform: uppercase; white-space: nowrap; }
+
+/* --- HUD JOGADOR --- */
+#hud-jogador { 
+    position: fixed; bottom: 0; left: 0; width: 100%; height: 180px; 
+    display: flex; justify-content: center; align-items: flex-end; 
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 15%, transparent); 
+    z-index: 100; pointer-events: none; 
+}
+#hud-jogador > * { pointer-events: auto; }
+
+.area-cartas-relativa { display: flex; justify-content: center; align-items: center; height: 100%; padding-bottom: 20px; transition: all 0.3s ease; min-width: 200px; }
+.area-cartas-relativa .carta { width: 110px; height: 160px; margin-right: -50px; box-shadow: -3px 0 10px rgba(0,0,0,0.7); transition: margin 0.2s, transform 0.2s; transform-origin: bottom center; border-radius: 8px; }
+.area-cartas-relativa .carta:hover { margin-right: -10px; transform: scale(1.15); z-index: 1000; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+.area-cartas-relativa .carta:last-child { margin-right: 0; }
+
+/* --- FERRAMENTAS E CHAT --- */
+#barra-ferramentas { position: fixed; bottom: 30px; right: 30px; display: flex; flex-direction: column-reverse; gap: 15px; z-index: 5000; pointer-events: auto; }
+.btn-icone { width: 60px; height: 60px; background: #34495e; border: 2px solid rgba(255,255,255,0.4); border-radius: 50%; color: white; font-size: 28px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.6); transition: all 0.2s; user-select: none; }
+.btn-icone:active { transform: scale(0.9); }
+.btn-icone:hover { background: #3498db; transform: scale(1.1); }
+.badge-chat { position: absolute; top: 0; right: 0; background: #e74c3c; width: 15px; height: 15px; border-radius: 50%; border: 2px solid #fff; display: none; }
+
+#janela-chat { 
+    position: fixed; bottom: 100px; right: 90px; width: 320px; height: 280px; 
+    background: rgba(30, 30, 30, 0.98); border: 1px solid #555; border-radius: 12px; 
+    display: none; flex-direction: column; z-index: 5000; box-shadow: 0 10px 30px rgba(0,0,0,0.8); 
+}
+#chat-header { padding: 12px; background: #222; border-bottom: 1px solid #444; display: flex; justify-content: space-between; font-weight: bold; border-radius: 12px 12px 0 0; }
+#chat-msgs { flex: 1; overflow-y: auto; padding: 10px; font-size: 13px; color: #ddd; display: flex; flex-direction: column; gap: 6px; }
+#chat-input-area { padding: 10px; border-top: 1px solid #444; display: flex; gap: 5px; }
+#chat-input { flex: 1; padding: 8px; background: #444; border: none; color: white; border-radius: 4px; }
+#chat-input-area button { background: #3498db; border: none; color: white; padding: 0 12px; border-radius: 4px; cursor: pointer; }
+
+/* CARTAS */
+.carta { background: white; border-radius: 6px; position: relative; }
+.carta img { width: 100%; height: 100%; border-radius: 6px; pointer-events: none; }
+.carta-verso { background: #2980b9 url('https://deckofcardsapi.com/static/img/back.png') no-repeat center/cover; border: 1px solid #fff; }
+.verso-vermelho { background-image: linear-gradient(rgba(192,57,43,0.5), rgba(192,57,43,0.5)), url('https://deckofcardsapi.com/static/img/back.png'); }
+
+.selecionada { transform: translateY(-40px) !important; border: 3px solid #f1c40f; box-shadow: 0 0 20px rgba(241, 196, 15, 0.8); z-index: 999; }
+.nova-carta { border: 3px solid #2ecc71 !important; box-shadow: 0 0 20px #2ecc71 !important; }
+
+.contador-badge { position: absolute; bottom: -10px; right: -10px; background: #e74c3c; color: #fff; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; border: 1px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+.grupo-baixado { display: flex; padding: 5px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-right: 15px; margin-bottom: 10px; position: relative; cursor: pointer; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.05); }
+.grupo-baixado:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+.grupo-baixado .carta { width: 60px; height: 85px; margin-right: -40px; box-shadow: -1px 0 4px rgba(0,0,0,0.5); }
+.grupo-baixado .carta:last-child { margin-right: 0; }
+
+.canastra-limpa { border: 2px solid #e74c3c; }
+.canastra-suja { border: 2px solid #95a5a6; }
+.tres-vermelho-bonus { width: 50px !important; height: 75px !important; margin: 5px !important; opacity: 0.9; }
+
+/* TELAS EXTRAS */
+.card-login, #modal-fim { z-index: 6000; }
+.card-login { background: #222; padding: 40px; border-radius: 15px; text-align: center; width: 350px; margin-top: 80px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444; }
+.card-login input { display: block; width: 100%; margin: 15px 0; padding: 12px; background: #333; border: 1px solid #555; color: white; border-radius: 5px; }
+.card-login button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; font-weight: bold; border-radius: 5px; border:none; transition: opacity 0.2s; }
+.card-login button:hover { opacity: 0.9; }
+
+#modal-fim { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); justify-content: center; align-items: center; flex-direction: column; }
+.tabela-extrato { display: flex; background: #222; width: 700px; margin-bottom: 20px; border-radius: 10px; overflow: hidden; border: 1px solid #444; }
+.coluna-labels { flex: 2; background: #1a1a1a; }
+.coluna-equipe { flex: 1; text-align: center; border-left: 1px solid #444; }
+.item-label, .item-valor { padding: 12px; font-size: 14px; border-bottom: 1px solid #333; height: 40px; display: flex; align-items: center; }
+.item-label { justify-content: flex-start; color: #aaa; padding-left: 20px; }
+.item-valor { justify-content: center; font-weight: bold; color: white; }
+.header { background: #111; color: #fff; font-weight: bold; text-transform: uppercase; font-size: 12px; height: 40px; }
+.total { background: #000; font-size: 20px; color: #f1c40f; border-top: 2px solid #444; height: 60px; }
+
+.balao-fala { position: absolute; background: white; color: black; padding: 10px 15px; border-radius: 20px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 5000; animation: popIn 0.3s; }
+@keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }

@@ -1,0 +1,22 @@
+{
+  "usuarios": {
+    "tchousp@gmail.com": {
+      "nome": "Teste",
+      "senha": "primeiraosenha",
+      "vitorias": 1,
+      "derrotas": 0,
+      "pontos": 100,
+      "premium": false,
+      "dataCadastro": "2026-02-02T04:37:35.844Z"
+    }
+  },
+  "partidas": [
+    {
+      "data": "2026-02-02T04:44:49.290Z",
+      "vencedores": [
+        "tchousp@gmail.com"
+      ],
+      "perdedores": []
+    }
+  ]
+}
