@@ -3,7 +3,7 @@ const http = require('http');
 const { Server } = require("socket.io");
 const path = require('path');
 
-// Importação da Lógica de Jogo
+// Importação da Lógica
 const { 
     prepararPartida, validarJogo, verificarSeEncaixa, separarTresVermelhos, ehTresVermelho, 
     ordenarMaoServer, ordenarJogoMesa, temCanastra, calcularResultadoFinal, calcularPlacarParcial,
@@ -16,20 +16,26 @@ const db = require('./servidor/db');
 const app = express();
 const server = http.createServer(app);
 
-// Configuração do Socket.io para Produção no Render
+// --- CORREÇÃO AQUI ---
+// Liberamos o CORS para "*" (qualquer origem) para evitar bloqueios entre
+// o endereço do Render e o seu domínio jogotranca.com.br
 const io = new Server(server, {
     cors: {
-        origin: ["https://jogotranca.com.br", "http://jogotranca.com.br", "https://*.onrender.com"],
-        methods: ["GET", "POST"]
+        origin: "*", 
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
-// Serve os arquivos da pasta public
+// Serve os arquivos do site
 app.use(express.static(path.join(__dirname, 'public')));
 
 let salas = {}; 
 
-// --- TRADUÇÃO E AUXILIARES ---
+// ... (Mantenha o restante das funções auxiliares: traduzirCarta, getContagemMaos, etc.)
+// Para facilitar, vou colar o bloco de funções auxiliares e lógica resumida aqui, 
+// mas se você já tem o arquivo cheio, só precisa mudar o bloco do "const io = ..." lá em cima.
+
 const traduzirCarta = (c) => {
     if (!c) return 'Carta';
     const faces = { 'A': 'Ás', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '10': '10', 'J': 'Valete', 'Q': 'Dama', 'K': 'Rei' };
@@ -151,6 +157,7 @@ const iniciarNovaRodada = (sala) => {
 
     setTimeout(() => {
         broadcastEstado(sala);
+        io.to(sala.id).emit('statusJogo', { msg: "PARTIDA INICIADA!" });
         io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno });
         verificarVezBot(sala);
     }, 1000);
@@ -197,7 +204,7 @@ const gameActions = {
             broadcastEstado(sala);
             io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno });
         } else {
-            if(socket) socket.emit('erroJogo', 'Você não pode justificar o lixo!');
+            if(socket) socket.emit('erroJogo', 'Esta carta não serve para você justificar a compra do lixo.');
         }
     },
 
@@ -207,20 +214,21 @@ const gameActions = {
             const mao = sala.jogo[`maoJogador${idx + 1}`];
             const novasCartas = dados.indices.map(i => mao[i]);
 
+            // Regra do Lixo
             if (sala.jogo.obrigacaoTopoLixo) {
                 const usouTopo = novasCartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo);
-                if (!usouTopo) { if(socket) socket.emit('erroJogo', "Use a carta do topo do lixo primeiro!"); return; }
+                if (!usouTopo) { if(socket) socket.emit('erroJogo', "Você deve usar a carta do topo do lixo primeiro!"); return; }
                 if (sala.jogo.idsMaoAntesDaCompra) {
                     const cartasAuxiliares = novasCartas.filter(c => c.id !== sala.jogo.obrigacaoTopoLixo);
                     const todasOriginais = cartasAuxiliares.every(c => sala.jogo.idsMaoAntesDaCompra.includes(c.id));
-                    if (!todasOriginais) { if(socket) socket.emit('erroJogo', "Justificativa inválida!"); return; }
+                    if (!todasOriginais) { if(socket) socket.emit('erroJogo', "Justificativa inválida: use cartas da sua mão original!"); return; }
                 }
                 sala.jogo.obrigacaoTopoLixo = null;
+                sala.jogo.idsMaoAntesDaCompra = null;
             }
 
-            // Regra da última carta
-            const restam = mao.length - dados.indices.length;
-            if (restam <= 1) {
+            const qtdRestante = mao.length - dados.indices.length;
+            if (qtdRestante <= 1) {
                 const idEq = idx % 2;
                 if (sala.jogo.equipePegouMorto[idEq] && !temCanastra(sala.jogo.jogosNaMesa[idEq])) {
                     if(socket) socket.emit('erroJogo', "Você não pode ficar com 1 carta sem ter canastra!");
@@ -250,7 +258,10 @@ const gameActions = {
     },
 
     descartarCarta: (sala, idx, indexCarta, socket) => {
-        if (sala.vez !== idx || sala.jogo.obrigacaoTopoLixo) return;
+        if (sala.vez !== idx || sala.jogo.obrigacaoTopoLixo) {
+            if(socket && sala.jogo.obrigacaoTopoLixo) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!");
+            return;
+        }
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
@@ -294,14 +305,8 @@ function verificarVezBot(sala) {
     if (id && id.startsWith('BOT')) jogarTurnoBot(sala, sala.vez, gameActions);
 }
 
-// --- CONEXÕES ---
 io.on('connection', (socket) => {
-    socket.on('login', d => { 
-        const r = db.loginUsuario(d.email, d.senha); 
-        if(r.sucesso) socket.emit('loginSucesso', r.usuario); 
-        else socket.emit('erroLogin', r.erro);
-    });
-    
+    socket.on('login', d => { const r = db.loginUsuario(d.email, d.senha); if(r.sucesso) socket.emit('loginSucesso', r.usuario); else socket.emit('erroLogin', r.erro); });
     socket.on('loginAnonimo', n => socket.emit('loginSucesso', { email: `anon_${socket.id}`, nome: n, anonimo: true }));
     
     socket.on('entrarSala', id => {
@@ -323,4 +328,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
