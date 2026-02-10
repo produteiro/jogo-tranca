@@ -4,7 +4,6 @@ if (!userId) {
     localStorage.setItem('tranca_userId', userId);
 }
 
-// AQUI ESTAVA O PROBLEMA: Esta linha deve aparecer apenas UMA vez
 const socket = io(); 
 
 let meuIdNoJogo = null;
@@ -147,7 +146,7 @@ function configurarEstadoJogo(d) {
     document.getElementById('meus-jogos').innerHTML = '<div class="watermark">SEUS JOGOS</div>'; 
     document.getElementById('jogos-adversarios').innerHTML = '<div class="watermark">JOGOS ADVERSÁRIOS</div>';
     if (d.tresVermelhos) d.tresVermelhos.forEach((cartas, idEquipe) => { if (cartas) cartas.forEach(c => adicionarTresVermelhoNaMesa(idEquipe, c)); });
-    if (d.jogosNaMesa) d.jogosNaMesa.forEach((jogosEquipe, idEquipe) => { if (jogosEquipe) jogosEquipe.forEach((cartas, idxJogo) => { renderizarJogoMesa(idEquipe, cartas, idxJogo); }); });
+    if (d.jogosNaMesa) d.jogosNaMesa.forEach((jogosEquipe, idEquipe) => { if (jogosEquipe) jogosEquipe.forEach((cartas, idxJogo) => { renderizarJogoMesaManual(idEquipe, cartas, idxJogo); }); });
     atualizarLixoVisual(d.lixoTopo); 
     atualizarMonteVisual(d.topoMonte, d.qtdMonte); 
     atualizarPlacarVisual(d.placar); 
@@ -380,8 +379,38 @@ socket.on('atualizarMortos', d => renderizarMortos(d));
 socket.on('atualizarLixo', d => atualizarLixoVisual(d));
 socket.on('lixoLimpo', () => { document.getElementById('carta-lixo').innerHTML = ""; document.getElementById('lixo').classList.remove('trancado'); });
 socket.on('tresVermelhoRevelado', d => adicionarTresVermelhoNaMesa(d.idJogador, d.carta));
-socket.on('mesaAtualizada', d => { const cont = obterContainerJogo(d.idJogador); const g = criarGrupoElemento(d.idJogador, cont.querySelectorAll('.grupo-baixado').length); d.cartas.forEach(c => adicionarCartaAoGrupo(g, c)); cont.appendChild(g); atualizarVisualCanastra(g, d.cartas); });
-socket.on('jogoAtualizado', d => { const cont = obterContainerJogo(d.idJogador); const g = cont.querySelectorAll('.grupo-baixado')[d.indexJogo]; if (g) { g.innerHTML = ""; d.cartas.forEach(c => adicionarCartaAoGrupo(g, c)); atualizarVisualCanastra(g, d.cartas); } });
+
+// --- CORREÇÃO PRINCIPAL: EVITAR DUPLICAÇÃO DE JOGOS ---
+socket.on('mesaAtualizada', d => { 
+    const cont = obterContainerJogo(d.idJogador); 
+    
+    // Verifica se é uma atualização de um jogo existente
+    if (d.index !== null && d.index >= 0) {
+        const grupos = cont.querySelectorAll('.grupo-baixado');
+        const grupoExistente = grupos[d.index];
+        if (grupoExistente) {
+            // Limpa o conteúdo velho antes de desenhar o novo
+            grupoExistente.innerHTML = "";
+            d.cartas.forEach(c => adicionarCartaAoGrupo(grupoExistente, c));
+            atualizarVisualCanastra(grupoExistente, d.cartas);
+            // Garante que o evento de clique continue correto
+            const minhaEquipe = meuIdNoJogo % 2;
+            const equipeDeles = d.idJogador % 2;
+            if (minhaEquipe === equipeDeles) {
+                grupoExistente.onclick = (e) => { e.stopPropagation(); tentarBaixarJogo(d.index); };
+            }
+        }
+    } else {
+        // Se index é null, é um jogo NOVO
+        // O índice será o comprimento atual
+        const novoIndex = cont.querySelectorAll('.grupo-baixado').length;
+        const g = criarGrupoElemento(d.idJogador, novoIndex);
+        d.cartas.forEach(c => adicionarCartaAoGrupo(g, c));
+        cont.appendChild(g); 
+        atualizarVisualCanastra(g, d.cartas); 
+    }
+});
+
 socket.on('statusJogo', d => { const msgs = document.getElementById('chat-msgs'); if(msgs) { const div = document.createElement('div'); div.style.color = "#f1c40f"; div.innerText = d.msg; msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight; } });
 socket.on('erroJogo', msg => alert(msg));
 socket.on('fimDeJogo', d => {
@@ -410,7 +439,16 @@ socket.on('fimDeJogo', d => {
 });
 
 function obterContainerJogo(idJogador) { const minhaEquipe = meuIdNoJogo % 2; const equipeDeles = idJogador % 2; const alvo = (minhaEquipe === equipeDeles) ? 'meus-jogos' : 'jogos-adversarios'; return document.getElementById(alvo); }
-function criarGrupoElemento(idJogador, index) { const g = document.createElement('div'); g.className = 'grupo-baixado'; const minhaEquipe = meuIdNoJogo % 2; const equipeDeles = idJogador % 2; if (minhaEquipe === equipeDeles) { g.onclick = (e) => { e.stopPropagation(); tentarBaixarJogo(index); }; } return g; }
+function criarGrupoElemento(idJogador, index) { 
+    const g = document.createElement('div'); 
+    g.className = 'grupo-baixado'; 
+    const minhaEquipe = meuIdNoJogo % 2; 
+    const equipeDeles = idJogador % 2; 
+    if (minhaEquipe === equipeDeles) { 
+        g.onclick = (e) => { e.stopPropagation(); tentarBaixarJogo(index); }; 
+    } 
+    return g; 
+}
 function adicionarCartaAoGrupo(grupo, c) { const div = document.createElement('div'); div.className = 'carta'; const img = document.createElement('img'); img.src = obterUrlCarta(c.face, c.naipe); div.appendChild(img); grupo.appendChild(div); }
 function atualizarVisualCanastra(grupoDiv, cartas) {
     grupoDiv.classList.remove('canastra-limpa', 'canastra-suja');
@@ -420,7 +458,7 @@ function atualizarVisualCanastra(grupoDiv, cartas) {
         else grupoDiv.classList.add('canastra-limpa');
     }
 }
-function renderizarJogoMesa(idEquipe, cartas, idxJogo) { 
+function renderizarJogoMesaManual(idEquipe, cartas, idxJogo) { 
     const cont = obterContainerJogo(idEquipe); 
     const g = criarGrupoElemento(idEquipe, idxJogo);
     cartas.forEach(c => adicionarCartaAoGrupo(g, c));
