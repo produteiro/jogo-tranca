@@ -372,6 +372,66 @@ body {
 
 #hud-jogador > * { pointer-events: auto; }
 
+/* 🆕 BARRA DE AÇÕES */
+#barra-acoes {
+    position: fixed;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 150;
+    display: flex;
+    gap: 12px;
+    pointer-events: auto;
+}
+
+#barra-acoes button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+#barra-acoes button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.7);
+}
+
+#barra-acoes button:active {
+    transform: translateY(0);
+}
+
+#btn-baixar-jogo {
+    background: #27ae60;
+    color: white;
+}
+
+#btn-baixar-jogo:hover {
+    background: #2ecc71;
+}
+
+#btn-descartar {
+    background: #e74c3c;
+    color: white;
+}
+
+#btn-descartar:hover {
+    background: #c0392b;
+}
+
+#btn-limpar-selecao {
+    background: #7f8c8d;
+    color: white;
+}
+
+#btn-limpar-selecao:hover {
+    background: #95a5a6;
+}
+
 .area-cartas-relativa { 
     display: flex; 
     justify-content: center; 
