@@ -20,6 +20,7 @@ socket.on('connect', () => {
         const usuario = JSON.parse(usuarioSalvo);
         if (!usuario.anonimo) {
             socket.emit('reentrarJogo', usuario);
+            socket.usuarioLogado = usuario; // Salva no socket
         } else {
             localStorage.removeItem('tranca_usuario');
             mostrarTelaLogin();
@@ -100,6 +101,7 @@ function jogarAnonimo() {
 
 socket.on('loginSucesso', (usuario) => {
     usuarioLogado = usuario;
+    socket.usuarioLogado = usuario; // Salva no socket para o servidor
     if (!usuario.anonimo) localStorage.setItem('tranca_usuario', JSON.stringify(usuario));
     mostrarLobby();
 });
@@ -150,158 +152,124 @@ function configurarEstadoJogo(d) {
     atualizarLixoVisual(d.lixoTopo); 
     atualizarMonteVisual(d.topoMonte, d.qtdMonte); 
     atualizarPlacarVisual(d.placar); 
-    atualizarStatus();
+    atualizarStatus(); 
 }
 
-function obterUrlCarta(f, n) {
-    if (!f || !n) return '';
-    const m = { 'copas': 'H', 'ouros': 'D', 'paus': 'C', 'espadas': 'S' };
-    return `https://deckofcardsapi.com/static/img/${f === '10' ? '0' : f}${m[n]}.png`;
-}
-
-function obterClasseVerso(origem) {
-    if (origem === 'vermelho') return 'carta-verso verso-vermelho';
-    return 'carta-verso verso-azul';
-}
-
-function obterElementoMao(idJogador) {
-    if (idJogador === meuIdNoJogo) return document.getElementById('minha-mao');
-    const diff = (idJogador - meuIdNoJogo + 4) % 4;
-    if (diff === 1) return document.getElementById('mao-esquerda');
-    if (diff === 2) return document.getElementById('mao-topo');
-    if (diff === 3) return document.getElementById('mao-direita');
-    return document.body;
-}
-
-function mostrarBalao(idJogador, msg) {
-    const area = document.getElementById('area-baloes'); 
-    const balao = document.createElement('div');
-    balao.className = 'balao-fala';
-    balao.innerText = msg;
-    let posRelativa = 'balao-eu';
-    if (idJogador !== meuIdNoJogo) {
-        const diff = (idJogador - meuIdNoJogo + 4) % 4;
-        if (diff === 1) posRelativa = 'balao-esq';
-        if (diff === 2) posRelativa = 'balao-topo';
-        if (diff === 3) posRelativa = 'balao-dir';
-    } else {
-        balao.classList.add('balao-eu');
+function obterUrlCarta(face, naipe) { 
+    if (!face || !naipe) {
+        console.error('Carta inválida:', face, naipe);
+        return 'https://deckofcardsapi.com/static/img/back.png'; // Retorna verso se inválido
     }
-    balao.classList.add(posRelativa);
-    area.appendChild(balao);
-    setTimeout(() => {
-        balao.style.opacity = '0';
-        setTimeout(() => balao.remove(), 500);
-    }, 4000);
+    
+    // Mapeamento de naipes
+    const mapeamentoNaipes = {
+        'copas': 'H',
+        'ouros': 'D', 
+        'paus': 'C',
+        'espadas': 'S'
+    };
+    
+    // Mapeamento de faces (10 vira 0 na API)
+    const faceAPI = face === '10' ? '0' : face;
+    const naipeAPI = mapeamentoNaipes[naipe.toLowerCase()];
+    
+    if (!naipeAPI) {
+        console.error('Naipe inválido:', naipe);
+        return 'https://deckofcardsapi.com/static/img/back.png';
+    }
+    
+    return `https://deckofcardsapi.com/static/img/${faceAPI}${naipeAPI}.png`;
 }
 
-function renderizarCartas(cartas) {
-    const div = document.getElementById('minha-mao');
-    if (!div) return;
-    div.innerHTML = "";
-    if (!cartas || !Array.isArray(cartas)) return;
-    if (cartas.length >= 11) div.classList.add('mao-cheia'); else div.classList.remove('mao-cheia');
-    cartas.forEach((c, i) => {
-        const cd = document.createElement('div');
-        let isDestaque = false;
-        if (cartaDestaque) {
-            if (c.id && cartaDestaque.id) isDestaque = (c.id === cartaDestaque.id);
-            else isDestaque = (c.face === cartaDestaque.face && c.naipe === cartaDestaque.naipe);
+function renderizarCartas(mao) {
+    const cont = document.getElementById('minha-mao');
+    if (!cont) return;
+    cont.innerHTML = "";
+    
+    console.log('🎴 Renderizando mão:', mao); // DEBUG
+    
+    mao.forEach((c, i) => {
+        if (!c) {
+            console.error('❌ Carta nula no índice', i);
+            return;
         }
-        cd.id = `carta-mao-${i}`;
-        let classes = 'carta';
-        if (isDestaque) classes += ' nova-carta';
-        if (cartasSelecionadas.includes(i)) classes += ' selecionada';
-        cd.className = classes;
-        cd.onclick = () => {
-            const p = cartasSelecionadas.indexOf(i);
-            if (p > -1) cartasSelecionadas.splice(p, 1); else cartasSelecionadas.push(i);
-            renderizarCartas(cartas);
+        
+        const div = document.createElement('div');
+        div.className = 'carta';
+        if (cartaDestaque && c.id === cartaDestaque.id) div.classList.add('nova-carta');
+        
+        const img = document.createElement('img'); 
+        const url = obterUrlCarta(c.face, c.naipe);
+        img.src = url;
+        
+        // DEBUG: Se a imagem falhar ao carregar, mostra erro
+        img.onerror = () => {
+            console.error('❌ Falha ao carregar:', url, 'Carta:', c);
         };
-        const img = document.createElement('img');
-        img.src = obterUrlCarta(c.face, c.naipe);
-        cd.appendChild(img); div.appendChild(cd);
+        
+        div.appendChild(img);
+        div.onclick = () => cliqueNaCarta(i);
+        cont.appendChild(div);
     });
 }
 
-function renderizarMaosAdversarios(maosCount) {
-    if (!maosCount || meuIdNoJogo === null) return;
-    const idsDivs = ['mao-esquerda', 'mao-topo', 'mao-direita'];
-    const idsInfos = ['info-esq', 'info-topo', 'info-dir'];
-    for (let i = 1; i <= 3; i++) {
-        const idxReal = (meuIdNoJogo + i) % 4;
-        const div = document.getElementById(idsDivs[i-1]);
-        if (div) {
-            div.innerHTML = "";
-            const count = maosCount[idxReal] || 0;
-            for (let j = 0; j < count; j++) {
-                const card = document.createElement('div');
-                card.className = "carta-miniatura"; 
-                div.appendChild(card);
-            }
-        }
-        const divInfo = document.getElementById(idsInfos[i-1]);
-        if (divInfo) divInfo.innerText = `Bot ${idxReal+1} (${maosCount[idxReal]})`;
-    }
-}
-
-function renderizarMortos(estado) {
-    const m1 = document.getElementById('morto1');
-    const m2 = document.getElementById('morto2');
-    if (m1) { m1.style.display = estado.morto1 ? 'block' : 'none'; m1.className = "pilha-morto " + obterClasseVerso('azul'); }
-    if (m2) { m2.style.display = estado.morto2 ? 'block' : 'none'; m2.className = "pilha-morto cruzado " + obterClasseVerso('vermelho'); }
-}
-
-function adicionarTresVermelhoNaMesa(idJogador, c) {
-    const minhaEquipe = meuIdNoJogo % 2;
-    const equipeDeles = idJogador % 2;
-    const containerId = (minhaEquipe === equipeDeles) ? 'meus-jogos' : 'jogos-adversarios';
-    const container = document.getElementById(containerId);
-    const jaTem = Array.from(container.querySelectorAll('img')).some(i => i.src.includes(obterUrlCarta(c.face, c.naipe)));
-    if(jaTem) return;
-    const div = document.createElement('div');
-    div.className = 'carta tres-vermelho-bonus';
-    const img = document.createElement('img');
-    img.src = obterUrlCarta(c.face, c.naipe);
-    div.appendChild(img);
-    container.insertBefore(div, container.children[1] || null);
-}
-
-function comprarDoMonte() { 
-    if (vezAtual === meuIdNoJogo && estadoTurno === 'comprando') {
-        socket.emit('comprarCarta'); 
-    } else {
-        const m = document.getElementById('monte');
-        m.style.transform = "translateX(5px)";
-        setTimeout(() => m.style.transform = "translateX(-5px)", 100);
-        setTimeout(() => m.style.transform = "translateX(0)", 200);
-    }
-}
-
-function responderDecisao(aceitou) { document.getElementById('modal-decisao').style.display = 'none'; socket.emit('responderPrimeiraCarta', aceitou); }
-function tentarBaixarJogo(idxMesa = null) { if (vezAtual === meuIdNoJogo && cartasSelecionadas.length > 0) { socket.emit('baixarJogo', { indices: cartasSelecionadas, indexJogoMesa: idxMesa }); cartasSelecionadas = []; } }
-function interagirComLixo() {
+function cliqueNaCarta(i) {
     if (vezAtual !== meuIdNoJogo) return;
-    if (estadoTurno === 'comprando') {
-        const lixo = document.getElementById('lixo');
-        if (lixo.classList.contains('trancado')) { alert("Lixo TRANCADO com 3 Preto! Compre do monte."); return; }
-        socket.emit('comprarLixo', []); 
-        cartasSelecionadas = [];
-    } else if (estadoTurno === 'descartando') {
-        if (cartasSelecionadas.length === 1) {
-            socket.emit('descartarCarta', cartasSelecionadas[0]);
-            cartasSelecionadas = [];
-        } else { alert("Selecione exatamente 1 carta para descartar!"); }
+    if (estadoTurno === 'descartando') { descartarCarta(i); return; }
+    const idx = cartasSelecionadas.indexOf(i);
+    if (idx !== -1) { cartasSelecionadas.splice(idx, 1); } else { cartasSelecionadas.push(i); }
+    const cartas = document.getElementById('minha-mao').children;
+    if (cartas[i]) { if (idx !== -1) cartas[i].classList.remove('selecionada'); else cartas[i].classList.add('selecionada'); }
+}
+
+function renderizarMaosAdversarios(counts) {
+    const renderizarMaoLateral = (containerId, qtd) => {
+        const c = document.getElementById(containerId);
+        if (!c) return;
+        const cartasExistentes = c.querySelectorAll('.carta-miniatura');
+        if (cartasExistentes.length === qtd) return;
+        c.innerHTML = "";
+        for (let i = 0; i < qtd; i++) { const div = document.createElement('div'); div.className = 'carta-miniatura'; c.appendChild(div); }
+    };
+    if (counts) {
+        renderizarMaoLateral('mao-esquerda', counts[1] || 0);
+        renderizarMaoLateral('mao-direita', counts[3] || 0);
+        renderizarMaoLateral('mao-topo', counts[2] || 0);
     }
 }
-function pedirReset() { if(confirm("Reiniciar partida?")) socket.emit('reiniciarPartida'); }
-function jogarNovamente() { socket.emit('reiniciarPartida'); }
 
-function alternarOrdenacao() { 
-    const btn = document.querySelector('.btn-icone[title="Ordenar Cartas"]');
-    if(btn) { btn.style.transform = "rotate(180deg)"; setTimeout(() => { btn.style.transform = "rotate(0deg)"; }, 300); }
-    socket.emit('alternarOrdenacao'); 
-    cartasSelecionadas = []; 
+function renderizarMortos(info) {
+    const m1 = document.getElementById('morto1'); const m2 = document.getElementById('morto2');
+    if (m1 && info.morto1 !== undefined) m1.style.display = info.morto1 ? 'block' : 'none';
+    if (m2 && info.morto2 !== undefined) m2.style.display = info.morto2 ? 'block' : 'none';
+}
+
+function adicionarTresVermelhoNaMesa(idJogador, carta) {
+    const minhaEquipe = meuIdNoJogo % 2; const equipeDeles = idJogador % 2;
+    const alvo = (minhaEquipe === equipeDeles) ? 'meus-jogos' : 'jogos-adversarios';
+    const cont = document.getElementById(alvo);
+    if (!cont) return;
+    const div = document.createElement('div'); div.className = 'carta tres-vermelho-bonus';
+    const img = document.createElement('img'); img.src = obterUrlCarta(carta.face, carta.naipe);
+    div.appendChild(img); cont.appendChild(div);
+}
+
+function comprarDoMonte() { if (vezAtual === meuIdNoJogo && estadoTurno === 'comprando') socket.emit('comprarCarta'); }
+function interagirComLixo() { if (vezAtual === meuIdNoJogo && estadoTurno === 'comprando') socket.emit('comprarLixo'); }
+
+function tentarBaixarJogo(indexJogoMesa = null) {
+    if (vezAtual !== meuIdNoJogo) return;
+    if (cartasSelecionadas.length < 3) { alert("Selecione ao menos 3 cartas!"); return; }
+    socket.emit('baixarJogo', { indices: cartasSelecionadas, indexJogoMesa });
+    cartasSelecionadas = [];
+    const cartas = document.getElementById('minha-mao').children;
+    Array.from(cartas).forEach(c => c.classList.remove('selecionada'));
+}
+
+function descartarCarta(i) {
+    if (vezAtual !== meuIdNoJogo) return;
+    if (estadoTurno !== 'descartando') return;
+    socket.emit('descartarCarta', i);
 }
 
 function atualizarStatus() {
@@ -346,18 +314,102 @@ function atualizarLixoVisual(carta) {
         else { areaLixo.classList.remove('trancado'); areaLixo.title = "Pegar Lixo"; }
     } else { const areaLixo = document.getElementById('lixo'); areaLixo.classList.remove('trancado'); }
 }
+
 function toggleChat() { 
     const chat = document.getElementById('janela-chat'); 
     const badge = document.querySelector('.badge-chat'); 
     if (chat.style.display === 'flex') { chat.style.display = 'none'; } else { chat.style.display = 'flex'; badge.style.display = 'none'; const msgs = document.getElementById('chat-msgs'); msgs.scrollTop = msgs.scrollHeight; } 
 }
 function enviarMensagem() { const input = document.getElementById('chat-input'); const msg = input.value.trim(); if (msg) { socket.emit('enviarChat', msg); input.value = ""; } }
-function fecharModalFim() { document.getElementById('modal-fim').style.display = 'none'; }
+
+// 🆕 FUNÇÕES CORRIGIDAS/IMPLEMENTADAS
+
+function pedirReset() {
+    if (confirm("Tem certeza que deseja reiniciar a partida?")) {
+        socket.emit('reiniciarPartida');
+    }
+}
+
+function alternarOrdenacao() {
+    socket.emit('alternarOrdenacao');
+}
+
+function jogarNovamente() {
+    document.getElementById('modal-fim').style.display = 'none';
+    socket.emit('reiniciarPartida');
+}
+
+function responderDecisao(aceita) {
+    const modal = document.getElementById('modal-decisao');
+    modal.style.display = 'none';
+    socket.emit('decisaoLixo', aceita);
+}
+
+function abrirRanking() {
+    socket.emit('buscarRanking');
+}
+
+socket.on('rankingAtualizado', (ranking) => {
+    const modal = document.getElementById('modal-ranking');
+    const lista = document.getElementById('lista-ranking');
+    lista.innerHTML = '';
+    
+    ranking.forEach((jogador, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="padding:8px;">${idx + 1}</td>
+            <td style="padding:8px;">${jogador.nome}${jogador.premium ? ' 👑' : ''}</td>
+            <td style="padding:8px;">${jogador.vitorias}</td>
+            <td style="padding:8px;">${jogador.pontos}</td>
+        `;
+        lista.appendChild(tr);
+    });
+    
+    modal.style.display = 'flex';
+});
+
+function mostrarBalao(idJogador, msg) {
+    const areaBaloes = document.getElementById('area-baloes');
+    if (!areaBaloes) return;
+    
+    const balao = document.createElement('div');
+    balao.className = 'balao-fala';
+    balao.innerText = msg;
+    
+    // Posiciona o balão de acordo com o jogador
+    if (idJogador === meuIdNoJogo) {
+        balao.style.bottom = '200px';
+        balao.style.left = '50%';
+        balao.style.transform = 'translateX(-50%)';
+    } else if (idJogador === ((meuIdNoJogo + 1) % 4)) {
+        balao.style.left = '100px';
+        balao.style.top = '50%';
+        balao.style.transform = 'translateY(-50%)';
+    } else if (idJogador === ((meuIdNoJogo + 2) % 4)) {
+        balao.style.top = '150px';
+        balao.style.left = '50%';
+        balao.style.transform = 'translateX(-50%)';
+    } else if (idJogador === ((meuIdNoJogo + 3) % 4)) {
+        balao.style.right = '100px';
+        balao.style.top = '50%';
+        balao.style.transform = 'translateY(-50%)';
+    }
+    
+    areaBaloes.appendChild(balao);
+    
+    // Remove após 3 segundos
+    setTimeout(() => {
+        balao.style.animation = 'fadeOut 0.3s';
+        setTimeout(() => balao.remove(), 300);
+    }, 3000);
+}
+
+// FIM DAS FUNÇÕES CORRIGIDAS
 
 socket.on('animacaoJogada', (dados) => {});
 socket.on('receberChat', (dados) => {
     const msgs = document.getElementById('chat-msgs'); const div = document.createElement('div');
-    if (dados.sistema) { div.style.color = "#f1c40f"; div.style.fontStyle = "italic"; div.style.textAlign = "center"; div.innerText = dados.msg; } else { div.style.background = "#444"; div.style.padding = "5px"; div.style.borderRadius = "5px"; div.innerText = dados.msg; if (dados.idJogador === meuIdNoJogo) div.style.background = "#2980b9"; mostrarBalao(dados.idJogador, dados.msg); }
+    if (dados.sistema) { div.style.color = "#f1c40f"; div.style.fontStyle = "italic"; div.style.textAlign = "center"; div.innerText = dados.msg; } else { div.style.background = "#444"; div.style.padding = "5px"; div.style.borderRadius = "5px"; div.innerText = dados.msg; if (dados.idJogador === meuIdNoJogo) div.style.background = "#2980b9"; if (dados.idJogador !== undefined && dados.idJogador !== -1) mostrarBalao(dados.idJogador, dados.msg); }
     msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
 });
 socket.on('decisaoPrimeiraCarta', (carta) => { const modal = document.getElementById('modal-decisao'); const divCarta = document.getElementById('carta-decisao'); divCarta.innerHTML = ""; const img = document.createElement('img'); img.src = obterUrlCarta(carta.face, carta.naipe); img.style.width = "100%"; img.style.height = "100%"; img.style.borderRadius = "6px"; divCarta.appendChild(img); modal.style.display = 'flex'; });
