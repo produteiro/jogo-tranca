@@ -183,15 +183,21 @@ const gameActions = {
 
     comprarLixo: (sala, idx, indices, socket) => {
         if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
-        const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
-        if (!cartaTopo) return;
+        if (sala.jogo.lixo.length === 0) return;
         
+        const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
+        if (cartaTopo.face === '3' && (cartaTopo.naipe === 'paus' || cartaTopo.naipe === 'espadas')) {
+            if(socket) socket.emit('erroJogo', 'Lixo trancado por 3 Preto!');
+            return;
+        }
+
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const idEquipe = idx % 2;
+        const jogosMesa = sala.jogo.jogosNaMesa[idEquipe];
         
-        if (verificarPossibilidadeCompra(mao, cartaTopo, sala.jogo.jogosNaMesa[idEquipe])) {
+        if (verificarPossibilidadeCompra(mao, cartaTopo, jogosMesa)) {
             sala.jogo.idsMaoAntesDaCompra = mao.map(c => c.id);
-            const todoLixo = sala.jogo.lixo.splice(0, sala.jogo.lixo.length);
+            const todoLixo = sala.jogo.lixo.splice(0);
             sala.jogo[`maoJogador${idx + 1}`] = mao.concat(todoLixo);
             sala.jogo.obrigacaoTopoLixo = cartaTopo.id;
             higienizarMaoComTresVermelhos(sala, idx);
@@ -290,7 +296,19 @@ const gameActions = {
         if (mao.length === 0) {
             const idEq = idx % 2;
             if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
-            else encerrarPartida(sala, idEq);
+            else {
+                // Verifica se tem canastra antes de bater
+                if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
+                    encerrarPartida(sala, idEq);
+                } else {
+                    // Não pode bater sem canastra - devolve a carta
+                    mao.push(carta);
+                    sala.jogo.lixo.pop();
+                    if(socket) socket.emit('erroJogo', 'Você não pode bater sem ter canastra!');
+                    if(socket) socket.emit('maoAtualizada', { mao });
+                    return;
+                }
+            }
         }
 
         sala.vez = (sala.vez + 1) % 4;
@@ -320,6 +338,27 @@ function entregarMorto(sala, idx) {
 
 function encerrarPartida(sala, idEquipeBateu) {
     const res = calcularResultadoFinal(sala, idEquipeBateu);
+    
+    // 🆕 SALVA ESTATÍSTICAS NO BANCO DE DADOS
+    try {
+        const equipe0 = [sala.usuarios[0], sala.usuarios[2]].filter(u => u && !u.anonimo);
+        const equipe1 = [sala.usuarios[1], sala.usuarios[3]].filter(u => u && !u.anonimo);
+        
+        const vencedores = idEquipeBateu === 0 ? equipe0 : equipe1;
+        const perdedores = idEquipeBateu === 0 ? equipe1 : equipe0;
+        
+        if (vencedores.length > 0 || perdedores.length > 0) {
+            db.registrarFimPartida({
+                vencedores: vencedores.map(u => u.email),
+                perdedores: perdedores.map(u => u.email),
+                pontosVencedor: idEquipeBateu === 0 ? res.placar.p1 : res.placar.p2,
+                pontosPerdedor: idEquipeBateu === 0 ? res.placar.p2 : res.placar.p1
+            });
+        }
+    } catch (e) {
+        console.error("Erro ao salvar estatísticas:", e);
+    }
+    
     io.to(sala.id).emit('fimDeJogo', res);
     delete salas[sala.id];
 }
@@ -330,6 +369,13 @@ function verificarVezBot(sala) {
 }
 
 io.on('connection', (socket) => {
+    // 🆕 CORRIGIDO: Agora o registro funciona!
+    socket.on('registro', d => {
+        const r = db.registrarUsuario(d.email, d.senha, d.nome);
+        if(r.sucesso) socket.emit('loginSucesso', r.usuario);
+        else socket.emit('erroLogin', r.erro);
+    });
+    
     socket.on('login', d => { 
         const r = db.loginUsuario(d.email, d.senha); 
         if(r.sucesso) socket.emit('loginSucesso', r.usuario); 
@@ -338,12 +384,24 @@ io.on('connection', (socket) => {
     
     socket.on('loginAnonimo', n => socket.emit('loginSucesso', { email: `anon_${socket.id}`, nome: n, anonimo: true }));
     
+    // 🆕 NOVO: Endpoint para buscar ranking
+    socket.on('buscarRanking', () => {
+        const ranking = db.obterRanking();
+        socket.emit('rankingAtualizado', ranking);
+    });
+    
     socket.on('entrarSala', id => {
         socket.join(id); socket.salaAtual = id;
-        if (!salas[id]) salas[id] = { id, jogadores: [null, null, null, null], donos: [null, null, null, null], jogo: null, vez: 0 };
+        if (!salas[id]) salas[id] = { id, jogadores: [null, null, null, null], donos: [null, null, null, null], usuarios: [null, null, null, null], jogo: null, vez: 0 };
         const s = salas[id];
         let slot = s.donos.indexOf(null);
-        if(slot !== -1) { s.donos[slot] = socket.id; s.jogadores[slot] = socket.id; }
+        if(slot !== -1) { 
+            s.donos[slot] = socket.id; 
+            s.jogadores[slot] = socket.id; 
+            // Salva informações do usuário
+            const usuarioAtual = socket.usuarioLogado || null;
+            s.usuarios[slot] = usuarioAtual;
+        }
         if(id === 'treino') { for(let i=0; i<4; i++) if(!s.donos[i]) { s.donos[i] = `BOT-${i}`; s.jogadores[i] = `BOT-${i}`; } }
         if(s.donos.every(d => d !== null) && !s.jogo) iniciarNovaRodada(s);
     });
