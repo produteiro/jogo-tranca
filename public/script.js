@@ -282,25 +282,73 @@ function renderizarCartas(mao) {
         
         cont.appendChild(div);
     });
+    
+    // 🆕 ATUALIZA BOTÕES DE AÇÃO
+    atualizarBotoesAcao();
 }
 
-// 🆕 FUNÇÃO DE CLIQUE CORRIGIDA - NÃO DESCARTA AUTOMATICAMENTE
+// 🆕 CONTROLA VISIBILIDADE DOS BOTÕES DE AÇÃO
+function atualizarBotoesAcao() {
+    const btnBaixar = document.getElementById('btn-baixar-jogo');
+    const btnDescartar = document.getElementById('btn-descartar');
+    const btnLimpar = document.getElementById('btn-limpar-selecao');
+    const qtdSel = document.getElementById('qtd-selecionadas');
+    const qtdDesc = document.getElementById('qtd-descartar');
+    
+    if (!btnBaixar || !btnDescartar || !btnLimpar) return;
+    
+    const qtd = cartasSelecionadas.length;
+    
+    // Atualiza contadores
+    if (qtdSel) qtdSel.innerText = qtd;
+    if (qtdDesc) qtdDesc.innerText = qtd;
+    
+    // Se não tem cartas selecionadas, esconde tudo
+    if (qtd === 0) {
+        btnBaixar.style.display = 'none';
+        btnDescartar.style.display = 'none';
+        btnLimpar.style.display = 'none';
+        return;
+    }
+    
+    // Sempre mostra botão limpar se tem seleção
+    btnLimpar.style.display = 'inline-block';
+    
+    // Mostra botões conforme o estado do turno
+    if (estadoTurno === 'descartando') {
+        // No estado de descarte, pode baixar OU descartar
+        if (qtd >= 3) {
+            btnBaixar.style.display = 'inline-block';
+        } else {
+            btnBaixar.style.display = 'none';
+        }
+        
+        if (qtd === 1) {
+            btnDescartar.style.display = 'inline-block';
+        } else {
+            btnDescartar.style.display = 'none';
+        }
+    } else {
+        // Fora do turno de descarte, não mostra nada
+        btnBaixar.style.display = 'none';
+        btnDescartar.style.display = 'none';
+    }
+}
+
+// 🆕 LIMPA SELEÇÃO
+function limparSelecao() {
+    cartasSelecionadas = [];
+    renderizarCartas(minhaMaoLocal);
+}
+
+// 🆕 FUNÇÃO DE CLIQUE CORRIGIDA - SEMPRE SELECIONA/DESELECIONA
 function cliqueNaCarta(i) {
     // Se não for minha vez, não faz nada
     if (vezAtual !== meuIdNoJogo) {
         return;
     }
     
-    // MODO DESCARTE: Clique descarta a carta
-    if (estadoTurno === 'descartando' && cartasSelecionadas.length === 0) {
-        // Confirma descarte
-        if (confirm(`Descartar ${minhaMaoLocal[i].face} de ${minhaMaoLocal[i].naipe}?`)) {
-            descartarCarta(i);
-        }
-        return;
-    }
-    
-    // MODO SELEÇÃO: Clique adiciona/remove da seleção
+    // SEMPRE MODO SELEÇÃO: Clique adiciona/remove da seleção
     const idx = cartasSelecionadas.indexOf(i);
     if (idx !== -1) {
         // Já está selecionada - remove
