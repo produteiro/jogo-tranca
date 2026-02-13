@@ -26,22 +26,73 @@ function embaralhar(array) {
     return array;
 }
 
-// Função visual para organizar a mesa
+// ==========================================
+// 🆕 ORDENAÇÃO INTELIGENTE DE JOGOS COM CORINGAS
+// ==========================================
 function ordenarJogoMesa(cartas) {
-    const curingas = cartas.filter(c => c.face === '2');
+    if (!cartas || cartas.length === 0) return [];
+    
+    const coringas = cartas.filter(c => c.face === '2');
     const normais = cartas.filter(c => c.face !== '2');
 
     if (normais.length === 0) return cartas; 
 
-    const naipe = normais[0].naipe;
-    const ehSequenciaPura = normais.every(c => c.naipe === naipe);
-
-    if (ehSequenciaPura) {
-        normais.sort((a, b) => ordemSequencia.indexOf(a.face) - ordemSequencia.indexOf(b.face));
-        return [...normais, ...curingas];
+    // Verifica se é trinca ou sequência
+    const faces = [...new Set(normais.map(c => c.face))];
+    
+    // É TRINCA - todas as cartas normais têm a mesma face
+    if (faces.length === 1) {
+        // Coringas vão no final em trincas
+        return [...normais, ...coringas];
     }
     
-    return [...normais, ...curingas];
+    // É SEQUÊNCIA - precisa ordenar e inserir coringas nas posições corretas
+    const naipe = normais[0].naipe;
+    
+    // Ordena cartas normais
+    normais.sort((a, b) => ordemSequencia.indexOf(a.face) - ordemSequencia.indexOf(b.face));
+    
+    // Verifica se tem 2s do mesmo naipe (são naturais, não curingas)
+    const doisDoNaipe = coringas.filter(c => c.naipe === naipe);
+    const curingasOutros = coringas.filter(c => c.naipe !== naipe);
+    
+    // Se tem 2s do naipe, adiciona eles como cartas naturais
+    if (doisDoNaipe.length > 0) {
+        doisDoNaipe.forEach(dois => normais.push(dois));
+        normais.sort((a, b) => ordemSequencia.indexOf(a.face) - ordemSequencia.indexOf(b.face));
+    }
+    
+    // Se não tem curingas de outros naipes, retorna ordenado
+    if (curingasOutros.length === 0) {
+        return normais;
+    }
+    
+    // Insere curingas nas posições dos buracos
+    const resultado = [];
+    let curingaIndex = 0;
+    
+    for (let i = 0; i < normais.length; i++) {
+        resultado.push(normais[i]);
+        
+        if (i < normais.length - 1 && curingaIndex < curingasOutros.length) {
+            const idxAtual = ordemSequencia.indexOf(normais[i].face);
+            const idxProx = ordemSequencia.indexOf(normais[i + 1].face);
+            
+            // Se tem buraco, insere coringa
+            if (idxProx - idxAtual > 1) {
+                resultado.push(curingasOutros[curingaIndex]);
+                curingaIndex++;
+            }
+        }
+    }
+    
+    // Se ainda tem curingas sobrando, coloca no início (para sequências que começam antes)
+    while (curingaIndex < curingasOutros.length) {
+        resultado.unshift(curingasOutros[curingaIndex]);
+        curingaIndex++;
+    }
+    
+    return resultado;
 }
 
 function prepararPartida() {
@@ -60,15 +111,24 @@ function prepararPartida() {
     });
     baralho = embaralhar(baralho);
     return {
-        monte: baralho, lixo: [],
+        monte: baralho, 
+        lixo: [],
         maoJogador1: ordenarMaoServer(baralho.splice(0, 11)),
         maoJogador2: ordenarMaoServer(baralho.splice(0, 11)),
         maoJogador3: ordenarMaoServer(baralho.splice(0, 11)),
         maoJogador4: ordenarMaoServer(baralho.splice(0, 11)),
-        morto1: baralho.splice(0, 11), morto2: baralho.splice(0, 11),
-        tresVermelhos: [[], []], jogosNaMesa: [[], []], equipePegouMorto: [false, false],
-        obrigacaoTopoLixo: null, idsMaoAntesDaCompra: null,
-        preferenciasOrdenacao: { 0: 'naipe', 1: 'naipe', 2: 'naipe', 3: 'naipe' }
+        morto1: baralho.splice(0, 11), 
+        morto2: baralho.splice(0, 11),
+        tresVermelhos: [[], []], 
+        jogosNaMesa: [[], []], 
+        equipePegouMorto: [false, false],
+        obrigacaoTopoLixo: null, 
+        idsMaoAntesDaCompra: null,
+        preferenciasOrdenacao: { 0: 'naipe', 1: 'naipe', 2: 'naipe', 3: 'naipe' },
+        // 🆕 Sistema de primeira compra dupla
+        primeiraCompra: true,
+        primeiraCompraJogador: null,
+        permitirRecompra: false
     };
 }
 
@@ -103,7 +163,9 @@ function ehTresVermelho(c) {
     return c.face === '3' && (c.naipe === 'copas' || c.naipe === 'ouros');
 }
 
-// --- VALIDAÇÃO INTELIGENTE ---
+// ==========================================
+// 🆕 VALIDAÇÃO CORRIGIDA - TRINCAS SEM VERIFICAÇÃO DE NAIPE
+// ==========================================
 function validarJogo(cartas) {
     if (cartas.length < 3) return false;
     
@@ -115,12 +177,17 @@ function validarJogo(cartas) {
     const uniqueFaces = [...new Set(facesNormais)];
     
     if (uniqueFaces.length === 1 && facesNormais.length > 0) {
+        // É uma trinca - mesma face
         const curingas = cartas.filter(c => c.face === '2');
-        if (curingas.length > 1) return false; 
-        const naipesNormais = cartas.filter(c => c.face !== '2').map(c => c.naipe);
-        const naipesUnicos = [...new Set(naipesNormais)];
-        if (naipesUnicos.length !== naipesNormais.length) return false; 
-        return true;
+        
+        // Máximo 1 curinga em trincas
+        if (curingas.length > 1) return false;
+        
+        // 🆕 CORREÇÃO: REMOVIDA VERIFICAÇÃO DE NAIPES
+        // Trincas podem ter cartas do MESMO naipe!
+        // A regra original da Tranca permite isso.
+        
+        return true; // ✅ Trinca válida
     }
 
     // 2. TENTATIVA DE SEQUÊNCIA
@@ -130,6 +197,8 @@ function validarJogo(cartas) {
     if (cartasNormais.length === 0) return false; 
 
     const naipeAlvo = cartasNormais[0].naipe;
+    
+    // Sequências devem ser do mesmo naipe
     if (cartasNormais.some(c => c.naipe !== naipeAlvo)) return false; 
 
     const doisDoNaipe = cartasDois.filter(c => c.naipe === naipeAlvo);
@@ -137,29 +206,40 @@ function validarJogo(cartas) {
     
     const testarSequenciaLogica = (listaNormais, qtdCuringas) => {
         if (qtdCuringas > 1) return false; 
+        
         listaNormais.sort((a, b) => ordemSequencia.indexOf(a.face) - ordemSequencia.indexOf(b.face));
+        
         let buracos = 0;
         for (let i = 0; i < listaNormais.length - 1; i++) {
             const idxAtual = ordemSequencia.indexOf(listaNormais[i].face);
             const idxProx = ordemSequencia.indexOf(listaNormais[i+1].face);
             const diff = idxProx - idxAtual;
-            if (diff === 0) return false; 
+            
+            if (diff === 0) return false; // Cartas duplicadas
             if (diff > 1) buracos += (diff - 1);
         }
+        
         return buracos <= qtdCuringas;
     };
 
+    // Testa com 2s do naipe como cartas naturais + curingas de outros naipes
     if (testarSequenciaLogica([...cartasNormais, ...doisDoNaipe], doisOutros.length)) {
         return true;
     }
 
+    // 🆕 SUPORTE A A-2-3 COM DOIS CURINGAS
+    // Se tiver A e 3, pode usar 2 curingas:
+    // - Um como "2 natural" (fica no jogo)
+    // - Outro como "substituto do buraco"
     if (doisDoNaipe.length > 0 && doisOutros.length === 0) {
         const umDoisViraCuringa = doisDoNaipe[0];
         const restoDoisNaturais = doisDoNaipe.slice(1);
+        
         if (testarSequenciaLogica([...cartasNormais, ...restoDoisNaturais], 1)) {
             return true;
         }
     }
+    
     return false;
 }
 
@@ -248,7 +328,7 @@ function calcularResultadoFinal(sala, eqBateu) {
 }
 
 // ==========================================
-// FUNÇÕES PARA O BOT - AGORA IMPLEMENTADAS!
+// 🆕 FUNÇÕES PARA O BOT - CORRIGIDAS
 // ==========================================
 
 function encontrarTrincas(mao) {
@@ -266,30 +346,17 @@ function encontrarTrincas(mao) {
     
     // Verifica cada grupo
     Object.values(grupos).forEach(indices => {
+        // 🆕 CORREÇÃO: Aceita 3+ cartas da mesma face, SEM verificar naipes
         if (indices.length >= 3) {
-            // Pega as 3 primeiras (ou mais se tiver)
-            const cartasDoGrupo = indices.map(i => mao[i]);
-            
-            // Verifica se os naipes são diferentes
-            const naipes = cartasDoGrupo.map(c => c.naipe);
-            const naipesUnicos = [...new Set(naipes)];
-            
-            if (naipesUnicos.length === cartasDoGrupo.length) {
-                // Todos os naipes são diferentes - trinca válida!
-                trincas.push(indices.slice(0, Math.min(indices.length, 4))); // Max 4 cartas (uma de cada naipe)
-            }
+            trincas.push(indices.slice(0, Math.min(indices.length, 4)));
         }
         
         // Também tenta com 2 cartas + 1 curinga (2)
         if (indices.length === 2) {
-            const cartasDoGrupo = indices.map(i => mao[i]);
-            const naipes = cartasDoGrupo.map(c => c.naipe);
-            if (naipes[0] !== naipes[1]) {
-                // Procura um 2 (curinga)
-                const idx2 = mao.findIndex((c, i) => c.face === '2' && !indices.includes(i));
-                if (idx2 !== -1) {
-                    trincas.push([...indices, idx2]);
-                }
+            // Procura um 2 (curinga)
+            const idx2 = mao.findIndex((c, i) => c.face === '2' && !indices.includes(i));
+            if (idx2 !== -1) {
+                trincas.push([...indices, idx2]);
             }
         }
     });
