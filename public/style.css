@@ -465,7 +465,7 @@ body {
 
 /* 🆕 HOVER SUTIL - SEM MOVIMENTO */
 .area-cartas-relativa .carta:hover {
-    margin-right: -40px; /* Leve espaçamento */
+    margin-right: -45px; /* Leve espaçamento */
     z-index: 998;
     box-shadow: 0 0 15px rgba(255,255,255,0.3);
     /* 🆕 REMOVIDO: transform: scale() */
@@ -1022,4 +1022,5 @@ body {
         padding-bottom: 5px;
     }
 }
+
 
