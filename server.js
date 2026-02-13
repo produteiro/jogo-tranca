@@ -297,31 +297,44 @@ const gameActions = {
         } catch(e) { console.error("Erro ao baixar jogo:", e); }
     },
 
-    descartarCarta: (sala, idx, indexCarta, socket) => {
+descartarCarta: (sala, idx, indexCarta, socket) => {
+        // Validação básica
         if (sala.vez !== idx || sala.jogo.obrigacaoTopoLixo) {
             if(socket && sala.jogo.obrigacaoTopoLixo) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!");
             return;
         }
+        
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         if(!mao[indexCarta]) return;
 
+        // Executa o descarte
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
         
-        // VERIFICA SE PERMITE RECOMPRA (PRIMEIRA COMPRA)
+        // --- LÓGICA DA PRIMEIRA COMPRA (RECOMPRA) ---
         if (sala.jogo.permitirRecompra) {
             sala.jogo.permitirRecompra = false;
-            sala.jogo.primeiraCompra = false;
-            sala.estadoTurno = 'comprando'; // Volta para comprar
+            sala.jogo.primeiraCompra = false; // Desativa para não acontecer de novo
+            sala.estadoTurno = 'comprando'; // Volta o estado para compra
             
+            // Atualiza o visual
             io.to(sala.id).emit('atualizarLixo', carta);
-            io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno });
+            io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno }); // Avisa que voltou a ser vez de comprar
             if(socket) socket.emit('maoAtualizada', { mao });
-            io.to(sala.id).emit('statusJogo', { msg: "Compre novamente!" });
+            
+            io.to(sala.id).emit('statusJogo', { msg: "Primeira compra! Jogador vai comprar novamente." });
             broadcastEstado(sala);
-            return; // NÃO PASSA A VEZ!
+
+            // 🔥 CORREÇÃO CRÍTICA AQUI 🔥
+            // Se quem descartou foi um BOT, ele precisa ser acordado para jogar de novo!
+            verificarVezBot(sala); 
+
+            return; // Interrompe a função aqui, NÃO passa a vez
         }
         
+        // --- LÓGICA PADRÃO DE FIM DE TURNO ---
+        
+        // Verifica batida
         if (mao.length === 0) {
             const idEq = idx % 2;
             if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
@@ -329,6 +342,7 @@ const gameActions = {
                 if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
                     encerrarPartida(sala, idEq);
                 } else {
+                    // Se bateu sem canastra, devolve a carta e avisa (regra opcional, mas comum)
                     mao.push(carta);
                     sala.jogo.lixo.pop();
                     if(socket) socket.emit('erroJogo', 'Você não pode bater sem ter canastra!');
@@ -338,12 +352,17 @@ const gameActions = {
             }
         }
 
+        // Passa a vez normalmente
         sala.vez = (sala.vez + 1) % 4;
         sala.estadoTurno = 'comprando';
+        
         io.to(sala.id).emit('atualizarLixo', carta);
         io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno });
         if(socket) socket.emit('maoAtualizada', { mao: sala.jogo[`maoJogador${idx + 1}`] });
+        
         broadcastEstado(sala);
+        
+        // Chama o próximo bot (se houver)
         verificarVezBot(sala);
     }
 };
@@ -505,3 +524,4 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
+
