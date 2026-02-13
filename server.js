@@ -370,6 +370,14 @@ function verificarVezBot(sala) {
 
 io.on('connection', (socket) => {
     // 🆕 CORRIGIDO: Agora o registro funciona!
+    // --- MONITORAMENTO DE ACESSOS ---
+    const totalJogadores = io.engine.clientsCount; // Conta quantos sockets tem conectados
+    const ipJogador = socket.handshake.address; // Tenta pegar o IP
+    
+    console.log(`[CONEXÃO] Novo jogador entrou.`);
+    console.log(`IP: ${ipJogador}`);
+    console.log(`Total Online: ${totalJogadores}`);
+    
     socket.on('registro', d => {
         const r = db.registrarUsuario(d.email, d.senha, d.nome);
         if(r.sucesso) socket.emit('loginSucesso', r.usuario);
@@ -383,6 +391,9 @@ io.on('connection', (socket) => {
     });
     
     socket.on('loginAnonimo', n => socket.emit('loginSucesso', { email: `anon_${socket.id}`, nome: n, anonimo: true }));
+    socket.on('disconnect', () => {
+        console.log(`[SAÍDA] Jogador saiu. Total Online: ${io.engine.clientsCount}`);
+    });
     
     // 🆕 NOVO: Endpoint para buscar ranking
     socket.on('buscarRanking', () => {
@@ -434,3 +445,4 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
+
