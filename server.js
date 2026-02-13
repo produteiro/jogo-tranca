@@ -128,9 +128,11 @@ const iniciarNovaRodada = (sala) => {
     sala.jogo = prepararPartida();
     sala.vez = Math.floor(Math.random() * 4);
     sala.estadoTurno = 'comprando';
+    
+    // 🆕 Define primeiro jogador para primeira compra dupla
+    sala.jogo.primeiraCompraJogador = sala.vez;
 
-    for (let i = 0; i < 4; i++) { higienizarMaoComTresVermelhos(sala, i); }
-
+    // 🆕 NÃO troca 3 vermelhos aqui - troca na vez de cada um
     const topoMonte = sala.jogo.monte.length > 0 ? { origem: sala.jogo.monte[sala.jogo.monte.length-1].origem } : null;
 
     sala.jogadores.forEach((sid, i) => {
@@ -177,9 +179,23 @@ const gameActions = {
     comprarDoMonte: (sala, idx, socket) => {
         if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
         if (!garantirMonteDisponivel(sala)) { encerrarPartida(sala, -1); return; }
+    
+        // 🆕 Verifica se é primeira compra
+        const ehPrimeiraCompra = sala.jogo.primeiraCompra && sala.jogo.primeiraCompraJogador === idx;
+    
         let carta = sala.jogo.monte.pop();
-        if (carta) efetivarCompra(sala, idx, carta, socket);
-    },
+        if (carta) {
+            efetivarCompra(sala, idx, carta, socket);
+        
+            // 🆕 Se for primeira compra, permite recompra
+            if (ehPrimeiraCompra) {
+                sala.jogo.permitirRecompra = true;
+                io.to(sala.id).emit('statusJogo', { 
+                    msg: "Primeira compra! Você pode descartar e comprar novamente." 
+            });
+        }
+    }
+},
 
     comprarLixo: (sala, idx, indices, socket) => {
         if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
@@ -282,43 +298,56 @@ const gameActions = {
         } catch(e) { console.error("Erro ao baixar jogo:", e); }
     },
 
-    descartarCarta: (sala, idx, indexCarta, socket) => {
-        if (sala.vez !== idx || sala.jogo.obrigacaoTopoLixo) {
-            if(socket && sala.jogo.obrigacaoTopoLixo) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!");
-            return;
-        }
-        const mao = sala.jogo[`maoJogador${idx + 1}`];
-        if(!mao[indexCarta]) return;
+descartarCarta: (sala, idx, indexCarta, socket) => {
+    if (sala.vez !== idx || sala.jogo.obrigacaoTopoLixo) {
+        if(socket && sala.jogo.obrigacaoTopoLixo) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!");
+        return;
+    }
+    const mao = sala.jogo[`maoJogador${idx + 1}`];
+    if(!mao[indexCarta]) return;
 
-        const carta = mao.splice(indexCarta, 1)[0];
-        sala.jogo.lixo.push(carta);
+    const carta = mao.splice(indexCarta, 1)[0];
+    sala.jogo.lixo.push(carta);
+    
+    // 🆕 VERIFICA SE PERMITE RECOMPRA (PRIMEIRA COMPRA)
+    if (sala.jogo.permitirRecompra) {
+        sala.jogo.permitirRecompra = false;
+        sala.jogo.primeiraCompra = false;
+        sala.estadoTurno = 'comprando'; // Volta para comprar
         
-        if (mao.length === 0) {
-            const idEq = idx % 2;
-            if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
-            else {
-                // Verifica se tem canastra antes de bater
-                if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
-                    encerrarPartida(sala, idEq);
-                } else {
-                    // Não pode bater sem canastra - devolve a carta
-                    mao.push(carta);
-                    sala.jogo.lixo.pop();
-                    if(socket) socket.emit('erroJogo', 'Você não pode bater sem ter canastra!');
-                    if(socket) socket.emit('maoAtualizada', { mao });
-                    return;
-                }
-            }
-        }
-
-        sala.vez = (sala.vez + 1) % 4;
-        sala.estadoTurno = 'comprando';
         io.to(sala.id).emit('atualizarLixo', carta);
         io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno });
-        if(socket) socket.emit('maoAtualizada', { mao: sala.jogo[`maoJogador${idx + 1}`] });
+        if(socket) socket.emit('maoAtualizada', { mao });
+        io.to(sala.id).emit('statusJogo', { msg: "Compre novamente!" });
         broadcastEstado(sala);
-        verificarVezBot(sala);
+        return; // 🆕 NÃO PASSA A VEZ!
     }
+    
+    // Resto do código normal...
+    if (mao.length === 0) {
+        const idEq = idx % 2;
+        if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
+        else {
+            if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
+                encerrarPartida(sala, idEq);
+            } else {
+                mao.push(carta);
+                sala.jogo.lixo.pop();
+                if(socket) socket.emit('erroJogo', 'Você não pode bater sem ter canastra!');
+                if(socket) socket.emit('maoAtualizada', { mao });
+                return;
+            }
+        }
+    }
+
+    sala.vez = (sala.vez + 1) % 4;
+    sala.estadoTurno = 'comprando';
+    io.to(sala.id).emit('atualizarLixo', carta);
+    io.to(sala.id).emit('mudancaVez', { vez: sala.vez, estado: sala.estadoTurno });
+    if(socket) socket.emit('maoAtualizada', { mao: sala.jogo[`maoJogador${idx + 1}`] });
+    broadcastEstado(sala);
+    verificarVezBot(sala);
+}
 };
 
 function entregarMorto(sala, idx) {
@@ -331,8 +360,9 @@ function entregarMorto(sala, idx) {
     const sid = sala.jogadores[idx];
     if (sid && !sid.startsWith('BOT')) {
         io.to(sid).emit('maoAtualizada', { mao: sala.jogo[`maoJogador${idx + 1}`] });
-        io.to(sid).emit('vocePegouMorto');
+        // 🆕 REMOVIDO emit('vocePegouMorto') - agora só mensagem no chat
     }
+    io.to(sala.id).emit('statusJogo', { msg: `Jogador ${idx + 1} pegou o morto!` });
     broadcastEstado(sala);
 }
 
@@ -364,8 +394,13 @@ function encerrarPartida(sala, idEquipeBateu) {
 }
 
 function verificarVezBot(sala) {
+    // 🆕 Troca 3 vermelhos do jogador da vez ANTES de jogar
+    higienizarMaoComTresVermelhos(sala, sala.vez);
+    
     const id = sala.jogadores[sala.vez];
-    if (id && id.startsWith('BOT')) jogarTurnoBot(sala, sala.vez, gameActions);
+    if (id && id.startsWith('BOT')) {
+        jogarTurnoBot(sala, sala.vez, gameActions);
+    }
 }
 
 io.on('connection', (socket) => {
@@ -401,48 +436,54 @@ io.on('connection', (socket) => {
         socket.emit('rankingAtualizado', ranking);
     });
     
-    socket.on('entrarSala', id => {
-        socket.join(id); socket.salaAtual = id;
-        if (!salas[id]) salas[id] = { id, jogadores: [null, null, null, null], donos: [null, null, null, null], usuarios: [null, null, null, null], jogo: null, vez: 0 };
-        const s = salas[id];
-        let slot = s.donos.indexOf(null);
-        if(slot !== -1) { 
-            s.donos[slot] = socket.id; 
-            s.jogadores[slot] = socket.id; 
-            // Salva informações do usuário
-            const usuarioAtual = socket.usuarioLogado || null;
-            s.usuarios[slot] = usuarioAtual;
+socket.on('entrarSala', id => {
+    socket.join(id); 
+    socket.salaAtual = id;
+    
+    if (!salas[id]) {
+        salas[id] = { 
+            id, 
+            jogadores: [null, null, null, null], 
+            donos: [null, null, null, null], 
+            usuarios: [null, null, null, null], 
+            jogo: null, 
+            vez: 0 
+        };
+    }
+    
+    const s = salas[id];
+    let slot = s.donos.indexOf(null);
+    
+    if(slot !== -1) { 
+        s.donos[slot] = socket.id; 
+        s.jogadores[slot] = socket.id;
+        const usuarioAtual = socket.usuarioLogado || null;
+        s.usuarios[slot] = usuarioAtual;
+    }
+    
+    if(id === 'treino') { 
+        for(let i=0; i<4; i++) {
+            if(!s.donos[i]) { 
+                s.donos[i] = `BOT-${i}`; 
+                s.jogadores[i] = `BOT-${i}`; 
+            }
         }
-        if(id === 'treino') { for(let i=0; i<4; i++) if(!s.donos[i]) { s.donos[i] = `BOT-${i}`; s.jogadores[i] = `BOT-${i}`; } }
-        if(s.donos.every(d => d !== null) && !s.jogo) iniciarNovaRodada(s);
-    });
-
-    socket.on('comprarCarta', () => { const s = salas[socket.salaAtual]; if(s) gameActions.comprarDoMonte(s, s.vez, socket); });
-    socket.on('comprarLixo', () => { const s = salas[socket.salaAtual]; if(s) gameActions.comprarLixo(s, s.vez, [], socket); });
-    socket.on('baixarJogo', d => { const s = salas[socket.salaAtual]; if(s) gameActions.baixarJogo(s, s.vez, d, socket); });
-    socket.on('descartarCarta', i => { const s = salas[socket.salaAtual]; if(s) gameActions.descartarCarta(s, s.vez, i, socket); });
-    socket.on('enviarChat', m => io.to(socket.salaAtual).emit('receberChat', { msg: m, sistema: false }));
-    socket.on('reiniciarPartida', () => { const s = salas[socket.salaAtual]; if(s) iniciarNovaRodada(s); });
-
-    // Botão de Ordenar
-    socket.on('alternarOrdenacao', () => {
-        const s = salas[socket.salaAtual];
-        if (!s || !s.jogo) return;
-        const idx = s.jogadores.indexOf(socket.id);
-        if (idx === -1) return;
-        
-        if (!s.jogo.preferenciasOrdenacao) s.jogo.preferenciasOrdenacao = {};
-        const atual = s.jogo.preferenciasOrdenacao[idx] || 'naipe';
-        const novo = atual === 'naipe' ? 'valor' : 'naipe';
-        s.jogo.preferenciasOrdenacao[idx] = novo;
-        
-        s.jogo[`maoJogador${idx + 1}`] = ordenarMaoServer(s.jogo[`maoJogador${idx + 1}`], novo);
-        socket.emit('maoAtualizada', { mao: s.jogo[`maoJogador${idx + 1}`] });
-    });
+    }
+    
+    // 🆕 Timeout de segurança para evitar travamento
+    if(s.donos.every(d => d !== null) && !s.jogo) {
+        setTimeout(() => {
+            if (!s.jogo) { // Verifica novamente
+                console.log('Iniciando partida na sala:', id);
+                iniciarNovaRodada(s);
+            }
+        }, 500); // Delay de 500ms
+    }
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
+
 
