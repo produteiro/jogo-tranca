@@ -208,7 +208,7 @@ function atualizarMonte(sala) {
         elMonte.onclick = () => {
             if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
                 console.log('🎴 Comprando do monte...');
-                socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
+                socket.emit('comprarCarta'); // ✅ Evento correto do servidor
             }
         };
     }
@@ -249,7 +249,7 @@ function atualizarLixo(sala, estado) {
         areaLixo.onclick = () => {
             if (turnoAtivo && estado === 'comprando') {
                 console.log('🗑️ Pegando lixo...');
-                socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
+                socket.emit('comprarLixo'); // ✅ Evento correto do servidor
             }
         };
     } else {
@@ -384,13 +384,10 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
                 e.stopPropagation();
                 if (cartasSelecionadas.length > 0) {
                     console.log('🎯 Encaixando em jogo', idxJogo);
-                    socket.emit('jogada', { 
-                        acao: 'baixarJogo', 
-                        dados: { 
-                            indices: cartasSelecionadas, 
-                            indexJogoMesa: idxJogo 
-                        }
-                    });
+                    socket.emit('baixarJogo', { 
+                        indices: cartasSelecionadas, 
+                        indexJogoMesa: idxJogo 
+                    }); // ✅ Evento correto
                     cartasSelecionadas = [];
                 }
             };
@@ -462,13 +459,10 @@ function acaoBaixar() {
     }
     
     console.log('📥 Baixando jogo:', cartasSelecionadas);
-    socket.emit('jogada', { 
-        acao: 'baixarJogo', 
-        dados: { 
-            indices: cartasSelecionadas, 
-            indexJogoMesa: null 
-        }
-    });
+    socket.emit('baixarJogo', { 
+        indices: cartasSelecionadas, 
+        indexJogoMesa: null 
+    }); // ✅ Evento correto do servidor
     cartasSelecionadas = [];
 }
 
@@ -484,12 +478,7 @@ function acaoDescartar() {
     }
     
     console.log('🗑️ Descartando carta:', cartasSelecionadas[0]);
-    socket.emit('jogada', { 
-        acao: 'descartar', 
-        dados: { 
-            index: cartasSelecionadas[0] 
-        }
-    });
+    socket.emit('descartarCarta', cartasSelecionadas[0]); // ✅ Evento correto do servidor
     cartasSelecionadas = [];
 }
 
@@ -509,7 +498,7 @@ function acaoLimpar() {
 
 function acaoOrdenar() { 
     console.log('🔃 Ordenando cartas');
-    socket.emit('jogada', { acao: 'ordenar', dados: {} }); 
+    socket.emit('alternarOrdenacao'); // ✅ Evento correto do servidor
 }
 
 function pedirReset() {
@@ -539,6 +528,12 @@ window.jogarAnonimo = jogarAnonimo;
 window.fazerLogin = fazerLogin;
 window.entrarModoTreino = entrarModoTreino;
 
+// ✅ Aliases para compatibilidade com HTML
+window.tentarBaixarJogo = acaoBaixar;
+window.descartarCartaSelecionadas = acaoDescartar;
+window.limparSelecao = acaoLimpar;
+window.alternarOrdenacao = acaoOrdenar;
+
 // Eventos adicionais do socket
 socket.on('disconnect', () => {
     console.log('❌ Desconectado do servidor');
@@ -549,6 +544,75 @@ socket.on('disconnect', () => {
 socket.on('erroJogo', (msg) => {
     console.error('❌ Erro:', msg);
     alert(msg);
+});
+
+// ✅ Eventos importantes do servidor
+socket.on('maoAtualizada', (dados) => {
+    console.log('🃏 Mão atualizada:', dados);
+    if (dados.mao && ultimoEstadoSala) {
+        ultimoEstadoSala.jogo[`maoJogador${meuIndex + 1}`] = dados.mao;
+        renderizarMinhaMao(dados.mao);
+    }
+});
+
+socket.on('mudancaVez', (dados) => {
+    console.log('🔄 Mudança de vez:', dados);
+    if (ultimoEstadoSala) {
+        ultimoEstadoSala.vez = dados.vez;
+        ultimoEstadoSala.estadoTurno = dados.estado;
+        turnoAtivo = (dados.vez === meuIndex);
+        cartasSelecionadas = [];
+        atualizarMesa(ultimoEstadoSala);
+    }
+});
+
+socket.on('cartaComprada', (dados) => {
+    console.log('🎴 Carta comprada:', dados);
+    if (dados.mao && ultimoEstadoSala) {
+        ultimoEstadoSala.jogo[`maoJogador${meuIndex + 1}`] = dados.mao;
+        ultimoEstadoSala.estadoTurno = 'descartando';
+        renderizarMinhaMao(dados.mao);
+        atualizarBotoesAcao('descartando');
+    }
+});
+
+socket.on('atualizarPlacar', (placar) => {
+    console.log('📊 Placar atualizado:', placar);
+    const elNos = document.getElementById('pts-nos');
+    const elEles = document.getElementById('pts-eles');
+    if (elNos) elNos.innerText = placar.p1 || 0;
+    if (elEles) elEles.innerText = placar.p2 || 0;
+});
+
+socket.on('atualizarContadores', (dados) => {
+    console.log('🔢 Contadores:', dados);
+    const badgeMonte = document.getElementById('qtd-monte');
+    const badgeLixo = document.getElementById('qtd-lixo');
+    if (badgeMonte) badgeMonte.innerText = dados.monte || 0;
+    if (badgeLixo) badgeLixo.innerText = dados.lixo || 0;
+});
+
+socket.on('atualizarMaosCount', (counts) => {
+    console.log('👥 Contagem mãos:', counts);
+    if (ultimoEstadoSala && counts) {
+        atualizarAdversarios(ultimoEstadoSala);
+    }
+});
+
+socket.on('mesaAtualizada', (dados) => {
+    console.log('🎮 Mesa atualizada:', dados);
+    if (ultimoEstadoSala) {
+        // Atualiza jogos na mesa
+        socket.emit('solicitarEstado'); // Pede estado completo
+    }
+});
+
+socket.on('atualizarLixo', (carta) => {
+    console.log('🗑️ Lixo atualizado:', carta);
+    if (ultimoEstadoSala && carta) {
+        ultimoEstadoSala.jogo.lixo.push(carta);
+        atualizarLixo(ultimoEstadoSala, ultimoEstadoSala.estadoTurno);
+    }
 });
 
 console.log('✅ Script carregado com sucesso!');
