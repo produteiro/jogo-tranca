@@ -262,9 +262,22 @@ function atualizarMonte(sala) {
         
         // Click handler
         elMonte.onclick = () => {
+            console.log('🖱️ CLIQUE NO MONTE');
+            console.log('  turnoAtivo:', turnoAtivo);
+            console.log('  meuIndex:', meuIndex);
+            console.log('  sala.vez:', sala.vez);
+            console.log('  estadoTurno:', sala.estadoTurno);
+            console.log('  qtd:', qtd);
+            
             if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
-                console.log('🎴 Comprando do monte...');
-                socket.emit('comprarCarta'); // ✅ Evento correto do servidor
+                console.log('✅ EMITINDO comprarCarta');
+                socket.emit('comprarCarta');
+            } else {
+                console.error('❌ BLOQUEADO:', {
+                    turnoAtivo,
+                    estado: sala.estadoTurno,
+                    qtd
+                });
             }
         };
     }
@@ -568,9 +581,10 @@ function acaoLimpar() {
 }
 
 function acaoOrdenar() { 
-    console.log('🔃 Ordenando cartas');
-    socket.emit('alternarOrdenacao'); // ✅ Evento correto do servidor
-    window.alternarOrdenacao = acaoOrdenar;
+    console.log('🔃 CLIQUE REORDENAR');
+    console.log('  Socket conectado:', socket.connected);
+    socket.emit('alternarOrdenacao');
+    console.log('✅ Evento alternarOrdenacao emitido');
 }
 
 function pedirReset() {
@@ -719,5 +733,6 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
