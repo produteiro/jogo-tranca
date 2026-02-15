@@ -34,6 +34,13 @@ function fazerLogin() {
 
 function jogarAnonimo() { 
     const nome = 'Visitante-' + Math.floor(Math.random()*1000);
+    
+    // 🆕 LIMPA ESTADO ANTERIOR
+    meuIndex = -1;
+    turnoAtivo = false;
+    cartasSelecionadas = [];
+    ultimoEstadoSala = null;
+    
     socket.emit('loginAnonimo', nome); 
     
     const btn = document.querySelector('button[onclick="jogarAnonimo()"]');
@@ -90,15 +97,25 @@ function atualizarMesa(sala) {
     if (meuIndex === -1 && sala.donos) {
         meuIndex = sala.donos.findIndex(id => id === socket.id);
     }
-    console.log('🎮 Socket ID:', socket.id);
-    console.log('👥 Jogadores:', sala.jogadores);
-    console.log('✅ Meu índice:', meuIndex);
     
+    // 🆕 CORREÇÃO: Se ainda não achou, tenta pelos primeiros 4 slots
     if (meuIndex === -1) {
-        console.error('❌ Não consegui me encontrar na sala!');
-        return;
+        // Encontra primeiro slot não-bot
+        for (let i = 0; i < 4; i++) {
+            if (sala.jogadores[i] === socket.id || sala.donos[i] === socket.id) {
+                meuIndex = i;
+                break;
+            }
+        }
+        
+        // Se AINDA não achou, assume que é o primeiro humano (slot 0)
+        if (meuIndex === -1) {
+            console.warn('⚠️ Forçando meuIndex = 0 (primeiro jogador)');
+            meuIndex = 0;
+        }
     }
     
+    console.log('✅ Meu índice final:', meuIndex);    
     console.log('✅ Meu índice:', meuIndex);
     
     turnoAtivo = (sala.vez === meuIndex);
@@ -167,7 +184,6 @@ function atualizarMesa(sala) {
 function atualizarPlacar(sala) {
     if (!sala.jogo) return;
     
-    // Calcula placar básico pela pontuação das cartas na mesa
     let ptsNos = 0;
     let ptsEles = 0;
     
@@ -179,6 +195,12 @@ function atualizarPlacar(sala) {
             jogo.forEach(carta => {
                 ptsNos += carta.pontos || 0;
             });
+            
+            // 🆕 BÔNUS DE CANASTRA
+            if (jogo.length >= 7) {
+                const temCuringa = jogo.some(c => c.face === '2');
+                ptsNos += temCuringa ? 100 : 200;
+            }
         });
     }
     
@@ -187,7 +209,26 @@ function atualizarPlacar(sala) {
             jogo.forEach(carta => {
                 ptsEles += carta.pontos || 0;
             });
+            
+            // 🆕 BÔNUS DE CANASTRA
+            if (jogo.length >= 7) {
+                const temCuringa = jogo.some(c => c.face === '2');
+                ptsEles += temCuringa ? 100 : 200;
+            }
         });
+    }
+    
+    // 🆕 CONTA 3 VERMELHOS
+    if (sala.jogo.tresVermelhos && sala.jogo.tresVermelhos[idEq]) {
+        const qtd3Vermelhos = sala.jogo.tresVermelhos[idEq].length;
+        const temCanastra = sala.jogo.jogosNaMesa[idEq].some(j => j.length >= 7);
+        ptsNos += qtd3Vermelhos * (temCanastra ? 100 : -100);
+    }
+    
+    if (sala.jogo.tresVermelhos && sala.jogo.tresVermelhos[(idEq + 1) % 2]) {
+        const qtd3Vermelhos = sala.jogo.tresVermelhos[(idEq + 1) % 2].length;
+        const temCanastra = sala.jogo.jogosNaMesa[(idEq + 1) % 2].some(j => j.length >= 7);
+        ptsEles += qtd3Vermelhos * (temCanastra ? 100 : -100);
     }
     
     const elNos = document.getElementById('pts-nos');
@@ -529,6 +570,7 @@ function acaoLimpar() {
 function acaoOrdenar() { 
     console.log('🔃 Ordenando cartas');
     socket.emit('alternarOrdenacao'); // ✅ Evento correto do servidor
+    window.alternarOrdenacao = acaoOrdenar;
 }
 
 function pedirReset() {
@@ -541,6 +583,34 @@ function pedirReset() {
 function fazerLogout() { 
     localStorage.removeItem('tranca_sessao'); 
     location.reload(); 
+}
+
+// ==========================================
+// 💬 CHAT
+// ==========================================
+
+function toggleChat() {
+    const chat = document.getElementById('janela-chat');
+    if (!chat) return;
+    
+    if (chat.style.display === 'flex') {
+        chat.style.display = 'none';
+    } else {
+        chat.style.display = 'flex';
+        const msgs = document.getElementById('chat-msgs');
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    }
+}
+
+function enviarMensagem() {
+    const input = document.getElementById('chat-input');
+    if (!input) return;
+    
+    const msg = input.value.trim();
+    if (msg) {
+        socket.emit('enviarChat', msg);
+        input.value = '';
+    }
 }
 
 // ==========================================
@@ -563,6 +633,9 @@ window.tentarBaixarJogo = acaoBaixar;
 window.descartarCartaSelecionadas = acaoDescartar;
 window.limparSelecao = acaoLimpar;
 window.alternarOrdenacao = acaoOrdenar;
+
+window.toggleChat = toggleChat;
+window.enviarMensagem = enviarMensagem;
 
 // Eventos adicionais do socket
 socket.on('disconnect', () => {
@@ -646,4 +719,5 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
