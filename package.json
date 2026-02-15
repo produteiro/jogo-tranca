@@ -1,5 +1,5 @@
 {
-  "name": "tranca-royale",
+  "name": "jogo-tranca",
   "version": "1.2.0",
   "main": "server.js",
   "scripts": {
@@ -12,4 +12,5 @@
   "engines": {
     "node": ">=18.0.0"
   }
+
 }
