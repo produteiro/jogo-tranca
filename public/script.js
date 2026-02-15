@@ -80,12 +80,19 @@ socket.on('estadoJogo', (sala) => {
 
 function atualizarMesa(sala) {
     console.log('🔄 Atualizando mesa...');
-    
+    // ✅ NOVO: Validação de sala
+    if (!sala || !sala.jogo) {
+        console.error('❌ Sala inválida:', sala);
+        return;
+    }    
     // Descobre quem sou eu
     meuIndex = sala.jogadores.findIndex(id => id === socket.id);
     if (meuIndex === -1 && sala.donos) {
         meuIndex = sala.donos.findIndex(id => id === socket.id);
     }
+    console.log('🎮 Socket ID:', socket.id);
+    console.log('👥 Jogadores:', sala.jogadores);
+    console.log('✅ Meu índice:', meuIndex);
     
     if (meuIndex === -1) {
         console.error('❌ Não consegui me encontrar na sala!');
@@ -124,10 +131,18 @@ function atualizarMesa(sala) {
     atualizarLixo(sala, estado);
 
     // 5. RENDERIZA MINHA MÃO
-    const mao = sala.jogo[`maoJogador${meuIndex + 1}`];
-    if (mao) {
-        console.log('🃏 Minha mão:', mao.length, 'cartas');
+    const chaveMao = `maoJogador${meuIndex + 1}`;
+    console.log('🔑 Chave da mão:', chaveMao);
+    console.log('📦 Jogo completo:', Object.keys(sala.jogo));
+    
+    const mao = sala.jogo[chaveMao];
+    console.log('🃏 Mão encontrada:', mao);
+    
+    if (mao && Array.isArray(mao)) {
+        console.log('✅ Renderizando', mao.length, 'cartas');
         renderizarMinhaMao(mao);
+    } else {
+        console.error('❌ Mão inválida!', chaveMao, mao);
     }
 
     // 6. RENDERIZA JOGOS NA MESA
@@ -300,18 +315,33 @@ function renderizarMaoAdversario(idContainer, qtd) {
 // ==========================================
 
 function renderizarMinhaMao(cartas) {
-    const div = document.getElementById('minha-mao');
+    const div = document.getElementById('minha-mao'); // ✅ Mudou de querySelector para getElementById
+    console.log('🃏 Renderizando', cartas?.length, 'cartas'); // ✅ Adicionou log
     if (!div) {
-        console.error('❌ Container minha-mao não encontrado');
+        console.error('❌ Container minha-mao NÃO EXISTE NO DOM!');
+        console.log('🔍 Tentando procurar:', document.getElementById('minha-mao'));
         return;
     }
     
+    console.log('✅ Container encontrado:', div);
     div.innerHTML = '';
     
-    if (!cartas || cartas.length === 0) {
-        console.log('ℹ️ Sem cartas na mão');
+    if (!cartas) {
+        console.error('❌ Parâmetro cartas é NULL/UNDEFINED');
         return;
     }
+    
+    if (!Array.isArray(cartas)) {
+        console.error('❌ Parâmetro cartas NÃO É ARRAY:', typeof cartas);
+        return;
+    }
+    
+    if (cartas.length === 0) {
+        console.warn('⚠️ Array de cartas está VAZIO');
+        return;
+    }
+    
+    console.log('🎴 Iniciando renderização de', cartas.length, 'cartas');
     
     cartas.forEach((c, i) => {
         const el = document.createElement('div');
@@ -616,3 +646,4 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
