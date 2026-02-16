@@ -194,6 +194,7 @@ function atualizarMesa(sala) {
     
     renderizarJogos('meus-jogos', meusJogos, true);
     renderizarJogos('jogos-adversarios', jogosAdversarios, false);
+    renderizarTresVermelhos(sala);
 
     // 7. RENDERIZA ADVERSÁRIOS
     atualizarAdversarios(sala);
@@ -269,15 +270,14 @@ function atualizarLixo(sala, estado) {
     if (!divLixo || !areaLixo) return;
     
     const qtd = sala.jogo.lixo.length;
-    
-    console.log('🗑️ Lixo:', qtd, 'cartas');
-    
-    if (badge) {
-        badge.innerText = qtd;
-    }
+    if (badge) badge.innerText = qtd;
     
     divLixo.innerHTML = '';
     
+    // Remove eventos antigos para evitar duplicidade e limpa estilos
+    areaLixo.onclick = null;
+    areaLixo.classList.remove('ativo-brilhando');
+
     if (qtd > 0) {
         const topo = sala.jogo.lixo[qtd - 1];
         const cartaDiv = document.createElement('div');
@@ -285,25 +285,48 @@ function atualizarLixo(sala, estado) {
         cartaDiv.innerHTML = `<img src="${getImgUrl(topo)}">`;
         divLixo.appendChild(cartaDiv);
         
-        // Destaque se pode pegar
+        // Destaque e Clique se puder pegar
         if (turnoAtivo && estado === 'comprando') {
             areaLixo.classList.add('ativo-brilhando');
-        } else {
-            areaLixo.classList.remove('ativo-brilhando');
-        }
-        
-        // Click handler
-        areaLixo.onclick = () => {
-            if (turnoAtivo && estado === 'comprando') {
+            
+            // CORREÇÃO 1: Envia o evento no formato correto que o servidor espera
+            areaLixo.onclick = () => {
                 console.log('🗑️ Pegando lixo...');
-                socket.emit('comprarLixo'); // ✅ Evento correto do servidor
-            }
-        };
+                socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
+            };
+        }
     } else {
         divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:14px; padding:20px;">LIXO VAZIO</div>';
-        areaLixo.classList.remove('ativo-brilhando');
-        areaLixo.onclick = null;
     }
+}
+
+// CORREÇÃO 2: Função para mostrar os 3 Vermelhos na mesa (Visualização do Placar)
+function renderizarTresVermelhos(sala) {
+    // Vamos desenhá-los junto com os jogos baixados, mas com destaque visual
+    const idEq = meuIndex % 2;
+    const adversarioEq = (idEq + 1) % 2;
+    
+    const desenhar = (containerId, cartas) => {
+        const div = document.getElementById(containerId);
+        if (!div || !cartas || cartas.length === 0) return;
+        
+        // Cria um grupo visual para os 3 vermelhos
+        const grupo = document.createElement('div');
+        grupo.className = 'grupo-baixado';
+        grupo.style.border = '2px dashed #e74c3c'; // Borda vermelha tracejada para diferenciar
+        grupo.title = "3 Vermelhos (+100 ou -100 pts)";
+
+        cartas.forEach(c => {
+            const el = document.createElement('div');
+            el.className = 'carta tres-vermelho-bonus'; // Usa a classe CSS existente
+            el.innerHTML = `<img src="${getImgUrl(c)}">`;
+            grupo.appendChild(el);
+        });
+        div.prepend(grupo); // Adiciona no início da área de jogos
+    };
+
+    desenhar('meus-jogos', sala.jogo.tresVermelhos[idEq]);
+    desenhar('jogos-adversarios', sala.jogo.tresVermelhos[adversarioEq]);
 }
 
 function atualizarAdversarios(sala) {
@@ -747,6 +770,7 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
