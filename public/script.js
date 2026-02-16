@@ -426,34 +426,45 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
         return;
     }
     
-    // Mantém watermark
+    // Mantém watermark se existir
     const watermark = div.querySelector('.watermark');
     div.innerHTML = '';
     if (watermark) div.appendChild(watermark);
     
-    if (!jogos || jogos.length === 0) {
-        console.log('ℹ️ Sem jogos em', idDiv);
-        return;
-    }
+    if (!jogos || jogos.length === 0) return;
     
     jogos.forEach((jogo, idxJogo) => {
         const grupo = document.createElement('div');
         grupo.className = 'grupo-baixado';
         
-        // Se for meu jogo, permite clicar para encaixar cartas
+        // Verifica canastras para adicionar estilo visual
+        if (jogo.length >= 7) {
+            const temCuringa = jogo.some(c => c.face === '2' && c.naipe !== jogo[0].naipe); // Lógica simplificada visual
+            grupo.classList.add(temCuringa ? 'canastra-suja' : 'canastra-limpa');
+        }
+        
+        // --- CORREÇÃO DO CLIQUE PARA ENCAIXAR ---
         if (ehMeu && turnoAtivo) {
+            grupo.style.cursor = 'pointer';
             grupo.onclick = (e) => {
                 e.stopPropagation();
+                
                 if (cartasSelecionadas.length > 0) {
-                    console.log('🎯 Encaixando em jogo', idxJogo);
-                    socket.emit('baixarJogo', { 
-                        indices: cartasSelecionadas, 
-                        indexJogoMesa: idxJogo 
-                    }); // ✅ Evento correto
+                    console.log('🎯 Encaixando cartas no jogo índice:', idxJogo);
+                    
+                    // CORREÇÃO: Envia no formato 'jogada'
+                    socket.emit('jogada', { 
+                        acao: 'baixarJogo', 
+                        dados: { 
+                            indices: cartasSelecionadas, 
+                            indexJogoMesa: idxJogo // Envia o índice do jogo alvo
+                        } 
+                    });
+                    
                     cartasSelecionadas = [];
+                    atualizarVisualSelecao();
                 }
             };
-            grupo.style.cursor = 'pointer';
         }
 
         jogo.forEach(c => {
@@ -465,8 +476,6 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
         
         div.appendChild(grupo);
     });
-    
-    console.log('✅ Renderizados', jogos.length, 'jogos em', idDiv);
 }
 
 // ==========================================
@@ -516,16 +525,24 @@ function acaoBaixar() {
     }
     
     if (cartasSelecionadas.length < 3) {
-        alert("Selecione pelo menos 3 cartas.");
+        alert("Selecione pelo menos 3 cartas para baixar um jogo.");
         return;
     }
     
-    console.log('📥 Baixando jogo:', cartasSelecionadas);
-    socket.emit('baixarJogo', { 
-        indices: cartasSelecionadas, 
-        indexJogoMesa: null 
-    }); // ✅ Evento correto do servidor
+    console.log('📥 Enviando solicitação para baixar jogo:', cartasSelecionadas);
+    
+    // CORREÇÃO: Envia no formato que o servidor entende (evento 'jogada' com ação 'baixarJogo')
+    socket.emit('jogada', { 
+        acao: 'baixarJogo', 
+        dados: { 
+            indices: cartasSelecionadas, 
+            indexJogoMesa: null // null indica que é um jogo novo
+        } 
+    });
+    
+    // Limpa seleção preventivamente
     cartasSelecionadas = [];
+    atualizarVisualSelecao();
 }
 
 function acaoDescartar() {
@@ -730,6 +747,7 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
