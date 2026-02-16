@@ -182,62 +182,24 @@ function atualizarMesa(sala) {
 // ==========================================
 
 function atualizarPlacar(sala) {
-    if (!sala.jogo) return;
-    
-    let ptsNos = 0;
-    let ptsEles = 0;
-    
-    const idEq = meuIndex % 2;
-    
-    // Conta pontos dos jogos na mesa
-    if (sala.jogo.jogosNaMesa[idEq]) {
-        sala.jogo.jogosNaMesa[idEq].forEach(jogo => {
-            jogo.forEach(carta => {
-                ptsNos += carta.pontos || 0;
-            });
-            
-            // 🆕 BÔNUS DE CANASTRA
-            if (jogo.length >= 7) {
-                const temCuringa = jogo.some(c => c.face === '2');
-                ptsNos += temCuringa ? 100 : 200;
-            }
-        });
+    // Se o servidor já mandou o placar calculado (implementado no broadcastEstado do server.js), usamos ele.
+    if (sala.placarCalculado) {
+        const idEq = meuIndex % 2;
+        // Se eu sou time 0 (par ou ímpar dependendo da lógica), pego p1 ou p2
+        // Assumindo: Jogador 1 (index 0) e 3 (index 2) são Time P1
+        // Jogador 2 (index 1) e 4 (index 3) são Time P2
+        
+        const souTimeP1 = (meuIndex % 2 === 0);
+        
+        const ptsNos = souTimeP1 ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
+        const ptsEles = souTimeP1 ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
+
+        const elNos = document.getElementById('pts-nos');
+        const elEles = document.getElementById('pts-eles');
+        
+        if (elNos) elNos.innerText = ptsNos;
+        if (elEles) elEles.innerText = ptsEles;
     }
-    
-    if (sala.jogo.jogosNaMesa[(idEq + 1) % 2]) {
-        sala.jogo.jogosNaMesa[(idEq + 1) % 2].forEach(jogo => {
-            jogo.forEach(carta => {
-                ptsEles += carta.pontos || 0;
-            });
-            
-            // 🆕 BÔNUS DE CANASTRA
-            if (jogo.length >= 7) {
-                const temCuringa = jogo.some(c => c.face === '2');
-                ptsEles += temCuringa ? 100 : 200;
-            }
-        });
-    }
-    
-    // 🆕 CONTA 3 VERMELHOS
-    if (sala.jogo.tresVermelhos && sala.jogo.tresVermelhos[idEq]) {
-        const qtd3Vermelhos = sala.jogo.tresVermelhos[idEq].length;
-        const temCanastra = sala.jogo.jogosNaMesa[idEq].some(j => j.length >= 7);
-        ptsNos += qtd3Vermelhos * (temCanastra ? 100 : -100);
-    }
-    
-    if (sala.jogo.tresVermelhos && sala.jogo.tresVermelhos[(idEq + 1) % 2]) {
-        const qtd3Vermelhos = sala.jogo.tresVermelhos[(idEq + 1) % 2].length;
-        const temCanastra = sala.jogo.jogosNaMesa[(idEq + 1) % 2].some(j => j.length >= 7);
-        ptsEles += qtd3Vermelhos * (temCanastra ? 100 : -100);
-    }
-    
-    const elNos = document.getElementById('pts-nos');
-    const elEles = document.getElementById('pts-eles');
-    
-    if (elNos) elNos.innerText = ptsNos;
-    if (elEles) elEles.innerText = ptsEles;
-    
-    console.log('📊 Placar - Nós:', ptsNos, 'Eles:', ptsEles);
 }
 
 function atualizarMonte(sala) {
@@ -263,21 +225,14 @@ function atualizarMonte(sala) {
         // Click handler
         elMonte.onclick = () => {
             console.log('🖱️ CLIQUE NO MONTE');
-            console.log('  turnoAtivo:', turnoAtivo);
-            console.log('  meuIndex:', meuIndex);
-            console.log('  sala.vez:', sala.vez);
-            console.log('  estadoTurno:', sala.estadoTurno);
-            console.log('  qtd:', qtd);
             
+            // Verifica se é a vez e se o estado permite comprar
             if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
-                console.log('✅ EMITINDO comprarCarta');
-                socket.emit('comprarCarta');
+                console.log('✅ EMITINDO jogada: comprarMonte');
+                // CORREÇÃO: Envia o formato que o server.js espera no ouvinte socket.on('jogada')
+                socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
             } else {
-                console.error('❌ BLOQUEADO:', {
-                    turnoAtivo,
-                    estado: sala.estadoTurno,
-                    qtd
-                });
+                console.error('❌ BLOQUEADO:', { turnoAtivo, estado: sala.estadoTurno, qtd });
             }
         };
     }
@@ -582,9 +537,8 @@ function acaoLimpar() {
 
 function acaoOrdenar() { 
     console.log('🔃 CLIQUE REORDENAR');
-    console.log('  Socket conectado:', socket.connected);
-    socket.emit('alternarOrdenacao');
-    console.log('✅ Evento alternarOrdenacao emitido');
+    // CORREÇÃO: Envia o formato padrão de jogada que o server entende
+    socket.emit('jogada', { acao: 'ordenar', dados: {} });
 }
 
 function pedirReset() {
@@ -733,6 +687,7 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
