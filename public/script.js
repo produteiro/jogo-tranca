@@ -561,12 +561,19 @@ function toggleChat() {
     const chat = document.getElementById('janela-chat');
     if (!chat) return;
     
+    // Usa uma classe para controlar a visibilidade ou alterna style direto
     if (chat.style.display === 'flex') {
         chat.style.display = 'none';
     } else {
         chat.style.display = 'flex';
-        const msgs = document.getElementById('chat-msgs');
-        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+        // Foca no input ao abrir
+        setTimeout(() => {
+            const input = document.getElementById('chat-input');
+            if(input) input.focus();
+            // Rola para o fim
+            const msgs = document.getElementById('chat-msgs');
+            if (msgs) msgs.scrollTop = msgs.scrollHeight;
+        }, 100);
     }
 }
 
@@ -687,6 +694,7 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
