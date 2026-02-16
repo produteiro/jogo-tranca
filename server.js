@@ -304,6 +304,13 @@ io.on('connection', (socket) => {
         socket.emit('loginSucesso', socket.usuarioLogado);
     });
 
+    socket.on('enviarChat', (msg) => {
+        // Pega o nome do usuário da sessão ou usa o ID
+        const nome = socket.usuarioLogado ? socket.usuarioLogado.nome : `Jogador ${socket.id.substr(0,4)}`;
+        // Reenvia para todos na sala
+        io.to(socket.salaAtual).emit('receberChat', { nome: nome, msg: msg });
+    });
+
     socket.on('entrarSala', id => {
         socket.join(id); 
         socket.salaAtual = id;
@@ -368,3 +375,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
