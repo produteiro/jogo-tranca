@@ -302,7 +302,7 @@ function atualizarLixo(sala, estado) {
 
 // CORREÇÃO 2: Função para mostrar os 3 Vermelhos na mesa (Visualização do Placar)
 function renderizarTresVermelhos(sala) {
-    // Vamos desenhá-los junto com os jogos baixados, mas com destaque visual
+    if (!sala.jogo.tresVermelhos) return;
     const idEq = meuIndex % 2;
     const adversarioEq = (idEq + 1) % 2;
     
@@ -310,19 +310,22 @@ function renderizarTresVermelhos(sala) {
         const div = document.getElementById(containerId);
         if (!div || !cartas || cartas.length === 0) return;
         
-        // Cria um grupo visual para os 3 vermelhos
+        // Evita duplicar se já renderizou (verifica se já tem o container dos 3 vermelhos)
+        if (div.querySelector('.tres-vermelhos-grupo')) return; 
+
         const grupo = document.createElement('div');
-        grupo.className = 'grupo-baixado';
-        grupo.style.border = '2px dashed #e74c3c'; // Borda vermelha tracejada para diferenciar
-        grupo.title = "3 Vermelhos (+100 ou -100 pts)";
+        grupo.className = 'grupo-baixado tres-vermelhos-grupo';
+        grupo.style.border = '2px dashed #e74c3c'; 
+        grupo.style.opacity = '0.9';
+        grupo.title = "3 Vermelhos";
 
         cartas.forEach(c => {
             const el = document.createElement('div');
-            el.className = 'carta tres-vermelho-bonus'; // Usa a classe CSS existente
+            el.className = 'carta tres-vermelho-bonus'; 
             el.innerHTML = `<img src="${getImgUrl(c)}">`;
             grupo.appendChild(el);
         });
-        div.prepend(grupo); // Adiciona no início da área de jogos
+        div.prepend(grupo); 
     };
 
     desenhar('meus-jogos', sala.jogo.tresVermelhos[idEq]);
@@ -769,7 +772,44 @@ socket.on('atualizarLixo', (carta) => {
     }
 });
 
+// ✅ OUVINTE QUE FALTAVA PARA O FIM DE JOGO
+socket.on('fimDeJogo', (dados) => {
+    console.log('🏁 FIM DE JOGO:', dados);
+    document.getElementById('modal-fim').style.display = 'flex';
+    
+    // Preenche os dados do modal
+    const preencher = (prefixo, dadosEq) => {
+        document.getElementById(prefixo + '-batida').innerText = dadosEq.ptsBatida;
+        document.getElementById(prefixo + '-morto').innerText = dadosEq.ptsMorto;
+        document.getElementById(prefixo + '-limpa').innerText = dadosEq.ptsCanastrasLimpas;
+        document.getElementById(prefixo + '-suja').innerText = dadosEq.ptsCanastrasSujas;
+        document.getElementById(prefixo + '-3ver').innerText = dadosEq.pts3Vermelhos;
+        document.getElementById(prefixo + '-cartas').innerText = dadosEq.ptsCartasMao + dadosEq.ptsCartasMesa; // Soma simplificada para visualização
+    };
+
+    preencher('p1', dados.detalhes.p1);
+    preencher('p2', dados.detalhes.p2);
+    
+    document.getElementById('p1-total').innerText = dados.placar.p1;
+    document.getElementById('p2-total').innerText = dados.placar.p2;
+    
+    // Título do Vencedor
+    const souTimeP1 = (meuIndex % 2 === 0);
+    const meuPlacar = souTimeP1 ? dados.placar.p1 : dados.placar.p2;
+    const adversarioPlacar = souTimeP1 ? dados.placar.p2 : dados.placar.p1;
+    
+    const titulo = document.getElementById('titulo-vitoria');
+    if (meuPlacar > adversarioPlacar) {
+        titulo.innerText = "VITÓRIA!";
+        titulo.style.color = "#2ecc71";
+    } else {
+        titulo.innerText = "DERROTA";
+        titulo.style.color = "#e74c3c";
+    }
+});
+
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
