@@ -25,6 +25,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 let salas = {}; 
 
 // --- FUNÇÕES AUXILIARES ---
+
 const getContagemMaos = (sala) => {
     if (!sala || !sala.jogo) return [0, 0, 0, 0];
     return [
@@ -36,18 +37,22 @@ const getContagemMaos = (sala) => {
 const broadcastEstado = (sala) => {
     if(sala && sala.id && sala.jogo) {
         // Envia estado completo para garantir sincronia
-        io.to(sala.id).emit('estadoJogo', sala);
+        io.to(sala.id).emit('estadoJogo', {
+            ...sala,
+            placarCalculado: calcularPlacarParcial(sala),
+            maosCount: getContagemMaos(sala)
+        });
         
         // Atualizações pontuais para animações
         io.to(sala.id).emit('atualizarMaosCount', getContagemMaos(sala));
-        const placar = calcularPlacarParcial(sala);
-        io.to(sala.id).emit('atualizarPlacar', { p1: placar.p1.total, p2: placar.p2.total });
+        io.to(sala.id).emit('atualizarPlacar', calcularPlacarParcial(sala)); 
         io.to(sala.id).emit('atualizarContadores', { monte: sala.jogo.monte.length, lixo: sala.jogo.lixo.length });
     }
 };
 
 const garantirMonteDisponivel = (sala) => {
     if (sala.jogo.monte.length > 0) return true;
+    
     let novoMonte = [];
     if (sala.jogo.morto1.length > 0) {
         novoMonte = sala.jogo.morto1;
@@ -60,6 +65,7 @@ const garantirMonteDisponivel = (sala) => {
         sala.jogo.equipePegouMorto[1] = true;
         io.to(sala.id).emit('statusJogo', { msg: "Morto virou monte!" });
     }
+    
     if (novoMonte.length > 0) {
         sala.jogo.monte = novoMonte;
         broadcastEstado(sala); 
@@ -68,12 +74,11 @@ const garantirMonteDisponivel = (sala) => {
     return false;
 };
 
-const higienizarMaoComTresVermelhos = (sala, idxJogador) => {
+// Esta função deve ser declarada apenas UMA VEZ aqui
+const higienizarMaoComTresVermelhos = (sala, idx) => {
     try {
-        const idEquipe = idxJogador % 2;
-        let mao = sala.jogo[`maoJogador${idxJogador + 1}`];
-        if (!mao) return; 
-        
+        const idEquipe = idx % 2;
+        let mao = sala.jogo[`maoJogador${idx + 1}`];
         let trocou = false;
         let loop = 0;
         
@@ -81,25 +86,28 @@ const higienizarMaoComTresVermelhos = (sala, idxJogador) => {
             const { novaMao, tresEncontrados } = separarTresVermelhos(mao);
             if (tresEncontrados.length === 0) break;
             
-            tresEncontrados.forEach(c => {
-                sala.jogo.tresVermelhos[idEquipe].push(c);
-                io.to(sala.id).emit('receberChat', { idJogador: -1, msg: `Jogador ${idxJogador+1} trocou 3 Vermelho.`, sistema: true });
-            });
-            
+            tresEncontrados.forEach(c => sala.jogo.tresVermelhos[idEquipe].push(c));
             mao = novaMao;
             
-            // Repor cartas
             for(let i=0; i<tresEncontrados.length; i++){
-                if (garantirMonteDisponivel(sala)) {
+                // Se monte vazio, tenta pegar do morto
+                if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
+                
+                if (sala.jogo.monte.length > 0) {
                     mao.push(sala.jogo.monte.pop());
                     trocou = true;
+                    // Se zerou ao pegar, tenta repor imediatamente
+                    if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
                 }
             }
             loop++;
         }
         
+        sala.jogo[`maoJogador${idx + 1}`] = mao; // Salva a mão limpa
+        
         if (trocou) {
-            sala.jogo[`maoJogador${idxJogador + 1}`] = ordenarMaoServer(mao, 'naipe');
+            const modo = sala.jogo.preferenciasOrdenacao?.[idx] || 'naipe';
+            sala.jogo[`maoJogador${idx + 1}`] = ordenarMaoServer(mao, modo);
         }
     } catch (e) { console.error("Erro higienizar:", e); }
 };
@@ -107,36 +115,33 @@ const higienizarMaoComTresVermelhos = (sala, idxJogador) => {
 const iniciarNovaRodada = (sala) => {
     console.log(`[SALA ${sala.id}] Iniciando nova rodada...`);
     sala.jogo = prepararPartida();
-    sala.vez = 0; // Começa sempre pelo Jogador 1 (Dono da sala) para evitar confusão no início
+    sala.vez = 0; 
     sala.estadoTurno = 'comprando';
     sala.jogo.primeiraCompra = true;
-    sala.jogo.primeiraCompraJogador = sala.vez;
+    sala.jogo.primeiraCompraJogador = 0;
 
-    // Higieniza mãos iniciais
     for(let i=0; i<4; i++) higienizarMaoComTresVermelhos(sala, i);
 
     io.to(sala.id).emit('statusJogo', { msg: "--- NOVA PARTIDA INICIADA ---" });
     broadcastEstado(sala);
     
-    // Se o jogador 1 for Bot (modo treino), ele joga. Se for humano, espera.
     verificarVezBot(sala);
 };
 
 // --- AÇÕES DO JOGO ---
-// --- AÇÕES ---
 const gameActions = {
-    comprarDoMonte: (sala, idx) => {
+    comprarDoMonte: (sala, idx, socket) => {
         if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
         
-        // Verifica disponibilidade antes
+        // Se monte vazio, tenta repor antes de comprar
         if (sala.jogo.monte.length === 0) {
-            if (!garantirMonteDisponivel(sala)) return; // Fim de jogo real se não tiver morto
+            if (!garantirMonteDisponivel(sala)) return; 
         }
-        
-        const ehPrimeira = sala.jogo.primeiraCompra && sala.jogo.primeiraCompraJogador === idx;
+    
+        const ehPrimeiraCompra = sala.jogo.primeiraCompra && sala.jogo.primeiraCompraJogador === idx;
         const carta = sala.jogo.monte.pop();
         
-        // CORREÇÃO 3: Repõe IMEDIATAMENTE se zerou após o saque
+        // Se zerou DEPOIS de comprar, repõe imediatamente para não travar o próximo
         if (sala.jogo.monte.length === 0) {
             garantirMonteDisponivel(sala);
         }
@@ -145,134 +150,133 @@ const gameActions = {
         higienizarMaoComTresVermelhos(sala, idx);
         
         sala.estadoTurno = 'descartando';
-        if (ehPrimeira) sala.jogo.permitirRecompra = true;
         
+        if (ehPrimeiraCompra) {
+            sala.jogo.permitirRecompra = true;
+            io.to(sala.id).emit('statusJogo', { msg: "Primeira compra! Pode descartar e comprar de novo." });
+        }
+
         io.to(sala.jogadores[idx]).emit('cartaComprada', { cartaId: carta.id }); 
-        
         broadcastEstado(sala);
     },
-    
-    // ... (mantenha comprarLixo, baixarJogo e descartar iguais, apenas certifique-se que higienizarMaoComTresVermelhos abaixo também tem a correção)
-    comprarLixo: (sala, idx) => {
+
+    comprarLixo: (sala, idx, indices, socket) => {
         if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
         if (sala.jogo.lixo.length === 0) return;
         
-        const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length-1];
-        if (cartaTopo.face === '3' && (['paus','espadas'].includes(cartaTopo.naipe))) return;
-        
+        const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
+        if (cartaTopo.face === '3' && (['paus','espadas'].includes(cartaTopo.naipe))) {
+            if(socket) socket.emit('erroJogo', 'Lixo trancado!');
+            return;
+        }
+
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const jogosMesa = sala.jogo.jogosNaMesa[idx%2];
         
         if (verificarPossibilidadeCompra(mao, cartaTopo, jogosMesa)) {
             const lixo = sala.jogo.lixo.splice(0);
-            sala.jogo[`maoJogador${idx+1}`] = mao.concat(lixo);
+            sala.jogo[`maoJogador${idx + 1}`] = mao.concat(lixo);
             sala.jogo.obrigacaoTopoLixo = cartaTopo.id;
+            sala.jogo.idsMaoAntesDaCompra = mao.map(c => c.id);
             
             higienizarMaoComTresVermelhos(sala, idx);
             sala.estadoTurno = 'descartando';
-            sala.jogo.primeiraCompra = false;
+            sala.jogo.primeiraCompra = false; 
+            
+            io.to(sala.id).emit('lixoLimpo'); 
+            io.to(sala.id).emit('statusJogo', { msg: `Jogador ${idx+1} pegou o lixo!` });
             
             broadcastEstado(sala);
+        } else {
+            if(socket) socket.emit('erroJogo', 'Precisa justificar o lixo!');
         }
     },
-    
-    baixarJogo: (sala, idx, dados) => {
-       // ... (seu código atual de baixarJogo, sem alterações necessárias) ...
-       if (sala.vez !== idx) return;
-       const mao = sala.jogo[`maoJogador${idx+1}`];
-       const cartas = dados.indices.map(i => mao[i]);
-       
-       if (sala.jogo.obrigacaoTopoLixo) {
-           if (!cartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo)) return;
-           sala.jogo.obrigacaoTopoLixo = null;
-       }
 
-       let jogoFinal = [...cartas];
-       const idEq = idx % 2;
-       
-       if (dados.indexJogoMesa !== null) {
-           const alvo = sala.jogo.jogosNaMesa[idEq][dados.indexJogoMesa];
-           jogoFinal = [...alvo, ...cartas];
-       }
+    baixarJogo: (sala, idx, dados, socket) => {
+        if (sala.vez !== idx) return; 
+        const mao = sala.jogo[`maoJogador${idx + 1}`];
+        const cartas = dados.indices.map(i => mao[i]);
 
-       if (validarJogo(jogoFinal)) {
-           dados.indices.sort((a,b)=>b-a).forEach(i => mao.splice(i,1));
-           jogoFinal = ordenarJogoMesa(jogoFinal);
-           
-           if (dados.indexJogoMesa !== null) sala.jogo.jogosNaMesa[idEq][dados.indexJogoMesa] = jogoFinal;
-           else sala.jogo.jogosNaMesa[idEq].push(jogoFinal);
-           
-           if (mao.length === 0) {
-               if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
-               else if (temCanastra(sala.jogo.jogosNaMesa[idEq])) encerrarPartida(sala, idEq);
-           }
-           broadcastEstado(sala);
-       }
+        if (sala.jogo.obrigacaoTopoLixo) {
+            if (!cartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo)) {
+                if(socket) socket.emit('erroJogo', "Use a carta do lixo!"); 
+                return;
+            }
+            sala.jogo.obrigacaoTopoLixo = null; 
+        }
+
+        const idEquipe = idx % 2;
+        let jogoAlvo = (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) 
+                       ? sala.jogo.jogosNaMesa[idEquipe][dados.indexJogoMesa] : [];
+        let jogoFinal = [...jogoAlvo, ...cartas];
+
+        if (validarJogo(jogoFinal)) {
+            dados.indices.sort((a, b) => b - a).forEach(i => mao.splice(i, 1));
+            jogoFinal = ordenarJogoMesa(jogoFinal);
+            
+            if (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) {
+                sala.jogo.jogosNaMesa[idEquipe][dados.indexJogoMesa] = jogoFinal;
+            } else {
+                sala.jogo.jogosNaMesa[idEquipe].push(jogoFinal);
+            }
+            
+            if (mao.length === 0) {
+                if (!sala.jogo.equipePegouMorto[idEquipe]) entregarMorto(sala, idx);
+                else if (temCanastra(sala.jogo.jogosNaMesa[idEquipe])) encerrarPartida(sala, idEquipe);
+            }
+            
+            broadcastEstado(sala);
+        } else {
+            if(socket) socket.emit('erroJogo', 'Jogo inválido.');
+        }
     },
 
-    descartar: (sala, idx, indexCarta) => {
-        // ... (seu código atual de descartar, sem alterações necessárias) ...
-        if (sala.vez !== idx || sala.jogo.obrigacaoTopoLixo) return;
-        const mao = sala.jogo[`maoJogador${idx+1}`];
+    descartarCarta: (sala, idx, indexCarta, socket) => {
+        if (sala.vez !== idx) return;
+        if (sala.jogo.obrigacaoTopoLixo) {
+            if(socket) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!"); 
+            return; 
+        }
+
+        const mao = sala.jogo[`maoJogador${idx + 1}`];
+        if (!mao || !mao[indexCarta]) return;
+
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
-
+        
         if (sala.jogo.permitirRecompra) {
             sala.jogo.permitirRecompra = false;
             sala.jogo.primeiraCompra = false;
             sala.estadoTurno = 'comprando';
+            
+            io.to(sala.id).emit('statusJogo', { msg: "Descartou! Pode comprar novamente." });
             broadcastEstado(sala);
+            
             verificarVezBot(sala);
-            return;
+            return; 
         }
 
         if (mao.length === 0) {
-             const idEq = idx%2;
-             if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
-             else {
-                 if (temCanastra(sala.jogo.jogosNaMesa[idEq])) encerrarPartida(sala, idEq);
-                 else {
-                     mao.push(carta); sala.jogo.lixo.pop(); 
-                     return;
-                 }
-             }
+            const idEq = idx % 2;
+            if (!sala.jogo.equipePegouMorto[idEq]) entregarMorto(sala, idx);
+            else {
+                if (temCanastra(sala.jogo.jogosNaMesa[idEq])) encerrarPartida(sala, idEq);
+                else {
+                    mao.push(carta); 
+                    sala.jogo.lixo.pop();
+                    if(socket) socket.emit('erroJogo', 'Precisa de canastra para bater!');
+                    broadcastEstado(sala);
+                    return;
+                }
+            }
         }
 
         sala.vez = (sala.vez + 1) % 4;
         sala.estadoTurno = 'comprando';
+        
         broadcastEstado(sala);
         verificarVezBot(sala);
     }
-};
-
-// Também precisamos atualizar a função auxiliar para garantir que a troca de 3 vermelho não zere o monte sem repor
-const higienizarMaoComTresVermelhos = (sala, idx) => {
-    try {
-        const idEquipe = idx % 2;
-        let mao = sala.jogo[`maoJogador${idx + 1}`];
-        let trocou = false;
-        let loop = 0;
-        while (loop < 10) {
-            const { novaMao, tresEncontrados } = separarTresVermelhos(mao);
-            if (tresEncontrados.length === 0) break;
-            tresEncontrados.forEach(c => sala.jogo.tresVermelhos[idEquipe].push(c));
-            mao = novaMao;
-            for(let i=0; i<tresEncontrados.length; i++){
-                // Verifica se tem carta para repor
-                if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
-                
-                if (sala.jogo.monte.length > 0) {
-                    mao.push(sala.jogo.monte.pop());
-                    trocou = true;
-                    
-                    // Verifica novamente após retirar
-                    if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
-                }
-            }
-            loop++;
-        }
-        if (trocou) sala.jogo[`maoJogador${idx + 1}`] = ordenarMaoServer(mao, 'naipe');
-    } catch (e) { console.error(e); }
 };
 
 function entregarMorto(sala, idx) {
@@ -289,8 +293,6 @@ function entregarMorto(sala, idx) {
 function encerrarPartida(sala, idEquipeBateu) {
     const res = calcularResultadoFinal(sala, idEquipeBateu);
     io.to(sala.id).emit('fimDeJogo', res);
-    
-    // Limpa o jogo mas mantém a sala
     sala.jogo = null;
     sala.vez = 0;
 }
@@ -306,17 +308,19 @@ function verificarVezBot(sala) {
 }
 
 io.on('connection', (socket) => {
-    // Login
+    const totalJogadores = io.engine.clientsCount;
+    console.log(`[CONEXÃO] Jogador entrou. Total Online: ${totalJogadores}`);
+    
     socket.on('loginAnonimo', n => {
         socket.usuarioLogado = { email: `anon_${socket.id}`, nome: n, anonimo: true };
         socket.emit('loginSucesso', socket.usuarioLogado);
     });
 
     socket.on('enviarChat', (msg) => {
-        // Pega o nome do usuário da sessão ou usa o ID
         const nome = socket.usuarioLogado ? socket.usuarioLogado.nome : `Jogador ${socket.id.substr(0,4)}`;
-        // Reenvia para todos na sala
-        io.to(socket.salaAtual).emit('receberChat', { nome: nome, msg: msg });
+        if (socket.salaAtual) {
+            io.to(socket.salaAtual).emit('receberChat', { nome: nome, msg: msg });
+        }
     });
 
     socket.on('entrarSala', id => {
@@ -330,7 +334,6 @@ io.on('connection', (socket) => {
         const s = salas[id];
         let slot = s.donos.indexOf(null);
         
-        // Se já sou dono/jogador, reconecta no meu slot
         if (s.donos.includes(socket.id)) slot = s.donos.indexOf(socket.id);
         
         if(slot !== -1) { 
@@ -343,11 +346,9 @@ io.on('connection', (socket) => {
             for(let i=0; i<4; i++) if(!s.donos[i]) { s.donos[i] = `BOT-${i}`; s.jogadores[i] = `BOT-${i}`; }
         }
         
-        // Se a sala está cheia e não tem jogo, inicia
         if(s.donos.every(d => d !== null) && !s.jogo) {
             iniciarNovaRodada(s);
         } else if (s.jogo) {
-            // Se já tem jogo, envia o estado atual para quem reconectou
             socket.emit('estadoJogo', s);
         }
     });
@@ -370,18 +371,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    // CORREÇÃO DO RESET
     socket.on('resetJogo', () => {
         const s = salas[socket.salaAtual];
         if(s) {
-            console.log("Reset solicitado pelo jogador.");
-            s.jogo = null; // Mata o jogo atual
-            iniciarNovaRodada(s); // Força novo início
+            console.log("Reset solicitado.");
+            s.jogo = null; 
+            iniciarNovaRodada(s); 
         }
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
-
-
