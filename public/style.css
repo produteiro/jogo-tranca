@@ -1004,3 +1004,6 @@ body::after {
     .area-cartas-relativa .carta { width: 70px; height: 100px; margin-right: -36px; }
     .grupo-baixado .carta { width: 38px; height: 54px; margin-right: -25px; }
 }
+.chat-visivel {
+    display: flex !important;
+}
