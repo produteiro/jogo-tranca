@@ -232,34 +232,32 @@ function atualizarMonte(sala) {
     const badge = document.getElementById('qtd-monte');
     const qtd = sala.jogo.monte.length;
     
-    console.log('🎴 Monte:', qtd, 'cartas');
-    
-    if (badge) {
-        badge.innerText = qtd;
-    }
+    // Atualiza o número da bolinha
+    if (badge) badge.innerText = qtd;
     
     if (elMonte) {
-        if (qtd === 0) {
-            elMonte.style.opacity = '0.3';
-            elMonte.style.cursor = 'not-allowed';
-        } else {
-            elMonte.style.opacity = '1';
-            elMonte.style.cursor = 'pointer';
-        }
+        // Visual: Opacidade se estiver vazio
+        elMonte.style.opacity = (qtd === 0) ? '0.3' : '1';
+        elMonte.style.cursor = (qtd === 0) ? 'not-allowed' : 'pointer';
         
-        // Click handler
-        elMonte.onclick = () => {
-            console.log('🖱️ CLIQUE NO MONTE');
-            
-            // Verifica se é a vez e se o estado permite comprar
-            if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
-                console.log('✅ EMITINDO jogada: comprarMonte');
-                // CORREÇÃO: Envia o formato que o server.js espera no ouvinte socket.on('jogada')
+        // Remove classes antigas para limpar estado
+        elMonte.classList.remove('ativo-brilhando');
+        elMonte.onclick = null; // Limpa clicks antigos para não acumular
+
+        // Visual: Adiciona brilho se for a vez de comprar
+        if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
+            elMonte.classList.add('ativo-brilhando');
+        }
+
+        // Lógica de Clique:
+        // Define o clique SEMPRE (se tiver cartas), para evitar que o botão fique "morto".
+        // O servidor validará se é a vez.
+        if (qtd > 0) {
+            elMonte.onclick = () => {
+                console.log('🖱️ CLIQUE NO MONTE - Enviando solicitação...');
                 socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
-            } else {
-                console.error('❌ BLOQUEADO:', { turnoAtivo, estado: sala.estadoTurno, qtd });
-            }
-        };
+            };
+        }
     }
 }
 
@@ -531,8 +529,9 @@ function acaoBaixar() {
 }
 
 function acaoDescartar() {
+    // Validação local básica
     if (!turnoAtivo) {
-        console.log('❌ Não é sua vez');
+        console.log('❌ Tentativa de descarte fora do turno.');
         return;
     }
     
@@ -541,9 +540,21 @@ function acaoDescartar() {
         return;
     }
     
-    console.log('🗑️ Descartando carta:', cartasSelecionadas[0]);
-    socket.emit('descartarCarta', cartasSelecionadas[0]); // ✅ Evento correto do servidor
+    const indiceCarta = cartasSelecionadas[0];
+    console.log('🗑️ Descartando carta index:', indiceCarta);
+
+    // CORREÇÃO CRÍTICA: Envia no formato padrão 'jogada' que o server.js espera
+    socket.emit('jogada', { 
+        acao: 'descartar', 
+        dados: { index: indiceCarta } 
+    });
+
+    // Limpa a seleção visualmente imediatamente para evitar duplo clique
     cartasSelecionadas = [];
+    atualizarVisualSelecao();
+    
+    // Limpa destaque de carta comprada
+    ultimaCartaCompradaId = null; 
 }
 
 function acaoLimpar() { 
@@ -719,6 +730,7 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
