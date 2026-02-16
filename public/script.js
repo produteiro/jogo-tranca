@@ -58,6 +58,31 @@ socket.on('loginSucesso', (user) => {
     if(barra) barra.style.display = 'flex';
 });
 
+// Adicione em qualquer lugar do script.js junto com os outros socket.on
+socket.on('receberChat', (dados) => {
+    const divMsgs = document.getElementById('chat-msgs');
+    if (divMsgs) {
+        const p = document.createElement('p');
+        // Se for mensagem do sistema (ex: "Jogador pegou morto")
+        if (dados.sistema) {
+            p.style.color = '#f1c40f';
+            p.style.fontStyle = 'italic';
+            p.innerText = dados.msg;
+        } else {
+            p.innerHTML = `<strong>${dados.nome}:</strong> ${dados.msg}`;
+        }
+        divMsgs.appendChild(p);
+        divMsgs.scrollTop = divMsgs.scrollHeight;
+        
+        // Notificação visual no ícone se o chat estiver fechado
+        const chat = document.getElementById('janela-chat');
+        if (chat && chat.style.display === 'none') {
+            const badge = document.querySelector('.badge-chat');
+            if(badge) badge.style.display = 'block';
+        }
+    }
+});
+
 function entrarModoTreino() {
     console.log("🎮 Entrando na sala de treino...");
     socket.emit('entrarSala', 'treino');
@@ -694,6 +719,7 @@ socket.on('atualizarLixo', (carta) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
