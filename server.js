@@ -420,6 +420,39 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ✅ EVENTOS DIRETOS (compatibilidade)
+    socket.on('comprarCarta', () => {
+        const s = salas[socket.salaAtual];
+        if (s) gameActions.comprarDoMonte(s, s.vez, socket);
+    });
+    
+    socket.on('comprarLixo', () => {
+        const s = salas[socket.salaAtual];
+        if (s) gameActions.comprarLixo(s, s.vez, [], socket);
+    });
+    
+    socket.on('baixarJogo', (dados) => {
+        const s = salas[socket.salaAtual];
+        if (s) gameActions.baixarJogo(s, s.vez, dados, socket);
+    });
+    
+    socket.on('descartarCarta', (indexCarta) => {
+        const s = salas[socket.salaAtual];
+        console.log('📨 Recebido descartarCarta:', indexCarta);
+        if (s) gameActions.descartarCarta(s, s.vez, indexCarta, socket);
+    });
+    
+    socket.on('alternarOrdenacao', () => {
+        const s = salas[socket.salaAtual];
+        if (!s || !s.jogo) return;
+        const idx = s.vez;
+        const modo = s.jogo.preferenciasOrdenacao?.[idx] === 'naipe' ? 'valor' : 'naipe';
+        if(!s.jogo.preferenciasOrdenacao) s.jogo.preferenciasOrdenacao = {};
+        s.jogo.preferenciasOrdenacao[idx] = modo;
+        s.jogo[`maoJogador${idx + 1}`] = ordenarMaoServer(s.jogo[`maoJogador${idx + 1}`], modo);
+        broadcastEstado(s);
+    });
+
     socket.on('resetJogo', () => {
         const s = salas[socket.salaAtual];
         if(s) {
@@ -436,6 +469,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
