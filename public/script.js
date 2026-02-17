@@ -385,6 +385,18 @@ socket.on('fimDeJogo', (dados) => {
     }
 });
 
+// --- CORREÇÃO: Função que estava faltando e travava o jogo ---
+function atualizarVisualSelecao() {
+    if (!ultimoEstadoSala || meuIndex === -1) return;
+    
+    // Re-renderiza a mão para mostrar as bordas verdes nas cartas selecionadas
+    renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]);
+    
+    // Atualiza visibilidade dos botões (Baixar/Descartar)
+    atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
+}
+
+
 
 
 
