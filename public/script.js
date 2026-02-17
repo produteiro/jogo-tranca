@@ -396,8 +396,20 @@ function atualizarVisualSelecao() {
     atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 }
 
+function jogarNovamente() {
+    console.log('🔄 Iniciando nova partida...');
+    
+    const modalFim = document.getElementById('modal-fim');
+    if (modalFim) modalFim.style.display = 'none';
+    
+    meuIndex = -1;
+    turnoAtivo = false;
+    cartasSelecionadas = [];
+    ultimoEstadoSala = null;
+    
+    socket.emit('resetJogo');
+    console.log('✅ Pedido de reset enviado');
+}
 
-
-
-
-
+// No final do arquivo:
+window.jogarNovamente = jogarNovamente;
