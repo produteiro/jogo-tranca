@@ -59,47 +59,61 @@ socket.on('cartaComprada', (dados) => {
 });
 
 function atualizarMesa(sala) {
+    if (!sala || !sala.jogo) return;
+
+    // Identificação do Jogador
     meuIndex = sala.jogadores.findIndex(id => id === socket.id);
     if (meuIndex === -1 && sala.donos) meuIndex = sala.donos.findIndex(id => id === socket.id);
-    if (meuIndex === -1) return;
+    // Fallback para modo treino se não achar ID
+    if (meuIndex === -1) meuIndex = 0;
 
     turnoAtivo = (sala.vez === meuIndex);
     const estado = sala.estadoTurno;
 
+    // 1. Header e Status
     const info = document.getElementById('info-jogo');
     if(info) {
-        info.innerText = turnoAtivo 
-            ? `SUA VEZ (${estado === 'comprando' ? 'COMPRE' : 'JOGUE'})` 
-            : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
+        const nomeVez = (sala.vez === meuIndex) ? "SUA VEZ" : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
+        info.innerText = `${nomeVez} (${estado === 'comprando' ? 'COMPRAR' : 'JOGAR'})`;
         info.style.color = turnoAtivo ? '#f1c40f' : '#fff';
     }
 
-    if (sala.placarCalculado) { // Assumindo server envia objeto pronto
-        // Se server não enviar, precisa calcular aqui (mas o server.js novo envia)
+    // 2. Placar (Usa dados calculados do servidor)
+    if (sala.placarCalculado) {
+        const idEq = meuIndex % 2;
+        const ptsNos = (idEq === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
+        const ptsEles = (idEq === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
+        
+        document.getElementById('pts-nos').innerText = ptsNos;
+        document.getElementById('pts-eles').innerText = ptsEles;
     }
 
+    // 3. Componentes da Mesa
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
 
-    // Mãos Adversárias
-    const idxP = (meuIndex + 2) % 4;
-    const idxE = (meuIndex + 3) % 4; // Sentido horário (esquerda é anterior)
-    const idxD = (meuIndex + 1) % 4; // Direita é próximo
+    // 4. Adversários (Correção do Sumiço)
     const counts = sala.maosCount || [0,0,0,0];
+    const idxP = (meuIndex + 2) % 4; // Parceiro
+    const idxE = (meuIndex + 3) % 4; // Esquerda (Anterior)
+    const idxD = (meuIndex + 1) % 4; // Direita (Próximo)
     
     desenharMaoAdversario('mao-topo', counts[idxP]);
     desenharMaoAdversario('mao-esquerda', counts[idxE]);
     desenharMaoAdversario('mao-direita', counts[idxD]);
 
+    // 5. Minha Mão
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
+    // 6. Jogos na Mesa
     const idEq = meuIndex % 2;
     renderizarJogos('meus-jogos', sala.jogo.jogosNaMesa[idEq], true);
     renderizarJogos('jogos-adversarios', sala.jogo.jogosNaMesa[(idEq + 1) % 2], false);
     
+    // 7. 3 Vermelhos
     renderizarTresVermelhos(sala);
     
-    // Atualiza Botões
+    // 8. Botões
     atualizarBotoesAcao(estado);
 }
 
@@ -172,26 +186,42 @@ function toggleSelecao(i) {
 function renderizarJogos(idDiv, jogos, ehMeu) {
     const div = document.getElementById(idDiv);
     if (!div) return;
-    div.innerHTML = ''; 
-    // Watermark se quiser manter
+    
+    const watermark = div.querySelector('.watermark');
+    div.innerHTML = '';
+    if (watermark) div.appendChild(watermark);
+    
+    if (!jogos) return;
     
     jogos.forEach((jogo, idxJogo) => {
         const grupo = document.createElement('div');
         grupo.className = 'grupo-baixado';
+        
+        // CORREÇÃO: Clique direto no grupo para adicionar cartas (qualquer quantidade)
         if (ehMeu && turnoAtivo) {
-            grupo.onclick = () => {
-                if(cartasSelecionadas.length > 0) {
-                    socket.emit('jogada', { acao: 'baixarJogo', dados: { indices: cartasSelecionadas, indexJogoMesa: idxJogo }});
+            grupo.style.cursor = 'pointer';
+            grupo.onclick = (e) => {
+                e.stopPropagation();
+                if (cartasSelecionadas.length > 0) {
+                    console.log('🎯 Adicionando cartas ao jogo:', idxJogo);
+                    socket.emit('jogada', { 
+                        acao: 'baixarJogo', 
+                        dados: { indices: cartasSelecionadas, indexJogoMesa: idxJogo } 
+                    });
                     cartasSelecionadas = [];
+                    atualizarVisualSelecao();
                 }
             };
         }
+
+        // Renderiza as cartas do grupo
         jogo.forEach(c => {
-            const el = document.createElement('div');
-            el.className = 'carta';
-            el.innerHTML = `<img src="${getImgUrl(c)}">`;
-            grupo.appendChild(el);
+            const card = document.createElement('div');
+            card.className = 'carta';
+            card.innerHTML = `<img src="${getImgUrl(c)}">`;
+            grupo.appendChild(card);
         });
+        
         div.appendChild(grupo);
     });
 }
@@ -307,3 +337,4 @@ socket.on('fimDeJogo', (dados) => {
         // Preencher placar final se necessário
     }
 });
+
