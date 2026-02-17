@@ -71,7 +71,7 @@ function atualizarMesa(sala) {
     // 1. Header
     const info = document.getElementById('info-jogo');
     if(info) {
-        const nomeVez = (sala.vez === meuIndex) ? "SUA VEZ" : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
+        const nomeVez = turnoAtivo ? "SUA VEZ" : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
         info.innerText = `${nomeVez} (${estado === 'comprando' ? 'COMPRAR' : 'JOGAR'})`;
         info.style.color = turnoAtivo ? '#f1c40f' : '#fff';
     }
@@ -81,39 +81,31 @@ function atualizarMesa(sala) {
         const idEq = meuIndex % 2;
         const ptsNos = (idEq === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
         const ptsEles = (idEq === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
-        
         const elNos = document.getElementById('pts-nos');
         const elEles = document.getElementById('pts-eles');
         if(elNos) elNos.innerText = ptsNos;
         if(elEles) elEles.innerText = ptsEles;
     }
 
-    // 3. Mesa
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
 
-    // 4. Adversários (CORRIGIDO: Sentido Horário e Erro de Sintaxe 'counts')
-    const counts = sala.maosCount || [0,0,0,0];
+    // 3. Adversários (Sem erro de variável duplicada)
+    const contagemMaos = sala.maosCount || [0,0,0,0];
+    const idxDireita  = (meuIndex + 1) % 4;
+    const idxTopo     = (meuIndex + 2) % 4;
+    const idxEsquerda = (meuIndex + 3) % 4;
     
-    // SENTIDO HORÁRIO:
-    // Eu (0) -> Direita (1) -> Topo (2) -> Esquerda (3)
-    const idxDireita  = (meuIndex + 1) % 4; // Próximo a jogar
-    const idxTopo     = (meuIndex + 2) % 4; // Parceiro
-    const idxEsquerda = (meuIndex + 3) % 4; // Anterior
-    
-    desenharMaoAdversario('mao-direita', counts[idxDireita]);
-    desenharMaoAdversario('mao-topo', counts[idxTopo]);
-    desenharMaoAdversario('mao-esquerda', counts[idxEsquerda]);
+    desenharMaoAdversario('mao-direita', contagemMaos[idxDireita]);
+    desenharMaoAdversario('mao-topo', contagemMaos[idxTopo]);
+    desenharMaoAdversario('mao-esquerda', contagemMaos[idxEsquerda]);
 
-    // 5. Minha Mão
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
-    // 6. Jogos
     const idEq = meuIndex % 2;
     renderizarJogos('meus-jogos', sala.jogo.jogosNaMesa[idEq], true);
     renderizarJogos('jogos-adversarios', sala.jogo.jogosNaMesa[(idEq + 1) % 2], false);
     
-    // 7. Extras
     renderizarTresVermelhos(sala);
     atualizarBotoesAcao(estado);
 }
@@ -281,10 +273,32 @@ function atualizarBotoesAcao(estado) {
 
 // Ações Globais
 window.acaoDescartar = function() {
-    if(cartasSelecionadas.length !== 1) return alert("Selecione 1 carta");
-    socket.emit('jogada', { acao: 'descartar', dados: { index: cartasSelecionadas[0] } });
+    if (!turnoAtivo) {
+        console.log("❌ Tentativa de descarte fora da vez.");
+        return;
+    }
+    
+    if (cartasSelecionadas.length !== 1) {
+        alert("Selecione EXATAMENTE 1 carta para descartar.");
+        return;
+    }
+    
+    const indexCarta = cartasSelecionadas[0];
+    console.log(`🗑️ Enviando descarte: Index ${indexCarta}`);
+    
+    // Envia o comando. O servidor vai decidir se aceita (se não tiver obrigação pendente)
+    socket.emit('jogada', { 
+        acao: 'descartar', 
+        dados: { index: indexCarta } 
+    });
+    
+    // Limpeza visual imediata para feedback
     cartasSelecionadas = [];
     ultimaCartaCompradaId = null;
+    
+    // Força atualização visual dos botões
+    const btnDescartar = document.getElementById('btn-descartar');
+    if(btnDescartar) btnDescartar.style.display = 'none';
 };
 
 window.acaoBaixar = function() {
@@ -370,6 +384,7 @@ socket.on('fimDeJogo', (dados) => {
         if(elTotalP2) elTotalP2.innerText = dados.placar.p2;
     }
 });
+
 
 
 
