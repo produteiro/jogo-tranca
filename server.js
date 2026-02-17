@@ -191,30 +191,36 @@ const gameActions = {
         }
     },
 
-    baixarJogo: (sala, idx, dados, socket) => {
+baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return; 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
-        // --- VERIFICAÇÃO OBRIGAÇÃO LIXO ---
+        // --- CORREÇÃO: DESTRAVA LIXO POR EQUIVALÊNCIA ---
         if (sala.jogo.obrigacaoTopoLixo) {
             const idObrigacao = sala.jogo.obrigacaoTopoLixo;
             
-            // Verifica se a carta da obrigação está no grupo que está sendo baixado agora
-            const cumpriu = cartas.some(c => c.id === idObrigacao);
-            
-            // Verificação secundária: Se a carta for equivalente (mesma face/naipe)
-            const cartaObrigacaoNaMao = mao.find(c => c.id === idObrigacao);
-            const cumpriuEquivalente = cartaObrigacaoNaMao && cartas.some(c => c.face === cartaObrigacaoNaMao.face && c.naipe === cartaObrigacaoNaMao.naipe);
+            // Busca a carta original (pelo ID) ou tenta achar na mão
+            const cartaObrigacao = mao.find(c => c.id === idObrigacao) || 
+                                   // Se não achar na mão, tenta pegar dos metadados salvos na compra
+                                   { id: idObrigacao }; 
 
-            if (cumpriu || cumpriuEquivalente) {
-                sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA O JOGO
+            // Verifica se alguma das cartas baixadas é a do lixo OU IGUAL a ela (mesma Face/Naipe)
+            const cumpriu = cartas.some(c => 
+                c.id === idObrigacao || 
+                (c.face && cartaObrigacao.face && c.face === cartaObrigacao.face && c.naipe === cartaObrigacao.naipe)
+            );
+
+            if (cumpriu) {
+                sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA OBRIGAÇÃO
             } else {
-                // Se a carta da obrigação NEM ESTÁ MAIS NA MÃO (bug anterior), destrava
-                if (!cartaObrigacaoNaMao) {
-                    sala.jogo.obrigacaoTopoLixo = null;
+                // Se a carta não está nas que foram baixadas, ELA AINDA TEM QUE ESTAR NA MÃO.
+                // Se ela sumiu da mão (bug raro), limpamos a obrigação para não travar o jogo.
+                const aindaTemNaMao = mao.some(c => c.id === idObrigacao);
+                if (!aindaTemNaMao) {
+                    sala.jogo.obrigacaoTopoLixo = null; // Destrava segurança
                 } else {
-                    if(socket) socket.emit('erroJogo', "Para baixar, você DEVE usar a carta que pegou do lixo!"); 
+                    if(socket) socket.emit('erroJogo', "Você deve usar a carta do lixo para baixar!"); 
                     return;
                 }
             }
@@ -226,6 +232,7 @@ const gameActions = {
         let jogoFinal = [...jogoAlvo, ...cartas];
 
         if (validarJogo(jogoFinal)) {
+            // Remove cartas da mão (do maior índice para o menor para não deslocar)
             dados.indices.sort((a, b) => b - a).forEach(i => mao.splice(i, 1));
             jogoFinal = ordenarJogoMesa(jogoFinal);
             
@@ -430,6 +437,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
