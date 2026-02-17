@@ -102,6 +102,22 @@ function atualizarMesa(sala) {
     desenharMaoAdversario('mao-esquerda', counts[idxE]);
     desenharMaoAdversario('mao-direita', counts[idxD]);
 
+    // ... (código anterior dentro de atualizarMesa)
+
+    // 4. Adversários (CORREÇÃO SENTIDO HORÁRIO)
+    const counts = sala.maosCount || [0,0,0,0];
+    
+    // SENTIDO HORÁRIO: O próximo jogador (meuIndex + 1) fica à ESQUERDA
+    const idxE = (meuIndex + 1) % 4; // Esquerda (Próximo a jogar)
+    const idxP = (meuIndex + 2) % 4; // Topo (Parceiro)
+    const idxD = (meuIndex + 3) % 4; // Direita (Anterior)
+    
+    desenharMaoAdversario('mao-topo', counts[idxP]);
+    desenharMaoAdversario('mao-esquerda', counts[idxE]);
+    desenharMaoAdversario('mao-direita', counts[idxD]);
+
+    // ... (restante da função)
+
     // 5. Minha Mão
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
@@ -369,5 +385,6 @@ socket.on('fimDeJogo', (dados) => {
         if(elTotalP2) elTotalP2.innerText = dados.placar.p2;
     }
 });
+
 
 
