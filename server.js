@@ -168,14 +168,18 @@ const gameActions = {
         }
 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
-        const idEquipe = idx % 2;
-        const jogosMesa = sala.jogo.jogosNaMesa[idEquipe];
+        const jogosMesa = sala.jogo.jogosNaMesa[idx%2];
         
         if (verificarPossibilidadeCompra(mao, cartaTopo, jogosMesa)) {
             const todoLixo = sala.jogo.lixo.splice(0);
             sala.jogo[`maoJogador${idx + 1}`] = mao.concat(todoLixo);
-            sala.jogo.obrigacaoTopoLixo = cartaTopo.id; // Guarda o ID da carta que TRAVA o jogo
-            sala.jogo.idsMaoAntesDaCompra = mao.map(c => c.id);
+            
+            // GRAVA OBRIGAÇÃO COMPLETA: ID, Face e Naipe para conferência à prova de falhas
+            sala.jogo.obrigacaoTopoLixo = {
+                id: cartaTopo.id,
+                face: cartaTopo.face,
+                naipe: cartaTopo.naipe
+            };
             
             higienizarMaoComTresVermelhos(sala, idx);
             sala.estadoTurno = 'descartando';
@@ -191,39 +195,25 @@ const gameActions = {
         }
     },
 
-baixarJogo: (sala, idx, dados, socket) => {
+    baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return; 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
-        // --- CORREÇÃO: DESTRAVA LIXO POR EQUIVALÊNCIA ---
+        // --- VERIFICAÇÃO FLEXÍVEL AO BAIXAR ---
         if (sala.jogo.obrigacaoTopoLixo) {
-            const idObrigacao = sala.jogo.obrigacaoTopoLixo;
+            const ob = sala.jogo.obrigacaoTopoLixo;
             
-            // Busca a carta original (pelo ID) ou tenta achar na mão
-            const cartaObrigacao = mao.find(c => c.id === idObrigacao) || 
-                                   // Se não achar na mão, tenta pegar dos metadados salvos na compra
-                                   { id: idObrigacao }; 
-
-            // Verifica se alguma das cartas baixadas é a do lixo OU IGUAL a ela (mesma Face/Naipe)
+            // Verifica se a carta baixada é a do lixo (ID ou Face/Naipe igual)
             const cumpriu = cartas.some(c => 
-                c.id === idObrigacao || 
-                (c.face && cartaObrigacao.face && c.face === cartaObrigacao.face && c.naipe === cartaObrigacao.naipe)
+                c.id === ob.id || 
+                (c.face === ob.face && c.naipe === ob.naipe)
             );
 
             if (cumpriu) {
                 sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA OBRIGAÇÃO
-            } else {
-                // Se a carta não está nas que foram baixadas, ELA AINDA TEM QUE ESTAR NA MÃO.
-                // Se ela sumiu da mão (bug raro), limpamos a obrigação para não travar o jogo.
-                const aindaTemNaMao = mao.some(c => c.id === idObrigacao);
-                if (!aindaTemNaMao) {
-                    sala.jogo.obrigacaoTopoLixo = null; // Destrava segurança
-                } else {
-                    if(socket) socket.emit('erroJogo', "Você deve usar a carta do lixo para baixar!"); 
-                    return;
-                }
             }
+            // OBS: Mesmo se não destravar aqui, a função descartarCarta fará a verificação final na mão.
         }
 
         const idEquipe = idx % 2;
@@ -232,7 +222,6 @@ baixarJogo: (sala, idx, dados, socket) => {
         let jogoFinal = [...jogoAlvo, ...cartas];
 
         if (validarJogo(jogoFinal)) {
-            // Remove cartas da mão (do maior índice para o menor para não deslocar)
             dados.indices.sort((a, b) => b - a).forEach(i => mao.splice(i, 1));
             jogoFinal = ordenarJogoMesa(jogoFinal);
             
@@ -254,69 +243,62 @@ baixarJogo: (sala, idx, dados, socket) => {
         }
     },
 
-descartarCarta: (sala, idx, indexCarta, socket) => {
+    descartarCarta: (sala, idx, indexCarta, socket) => {
         if (sala.vez !== idx) return;
-        
         const mao = sala.jogo[`maoJogador${idx + 1}`];
-        if (!mao || !mao[indexCarta]) {
-            console.log("Erro: Carta não encontrada no índice", indexCarta);
-            return;
-        }
+        if (!mao || !mao[indexCarta]) return;
 
-        // --- TRAVA DE SEGURANÇA LIXO ---
+        // --- CORREÇÃO DEFINITIVA (A "CURA" DO PROBLEMA) ---
+        // Antes de bloquear o descarte, verificamos se a carta que travava o jogo AINDA ESTÁ NA MÃO.
+        // Se ela não estiver na mão, significa que o jogador já baixou (mesmo que a flag ob não tenha limpado).
         if (sala.jogo.obrigacaoTopoLixo) {
-            const idObrigacao = sala.jogo.obrigacaoTopoLixo;
-            const cartaAindaNaMao = mao.find(c => c.id === idObrigacao);
-            // Se a carta ainda está na mão, bloqueia. Se já sumiu, libera.
-            if (cartaAindaNaMao) {
-                if(socket) socket.emit('erroJogo', "Baixe a carta do lixo antes de descartar!"); 
-                return;
+            const ob = sala.jogo.obrigacaoTopoLixo;
+            
+            const cartaAindaNaMao = mao.find(c => 
+                c.id === ob.id || 
+                (c.face === ob.face && c.naipe === ob.naipe)
+            );
+
+            if (!cartaAindaNaMao) {
+                // A carta SUMIU da mão (foi baixada). Problema resolvido.
+                sala.jogo.obrigacaoTopoLixo = null; 
             } else {
-                sala.jogo.obrigacaoTopoLixo = null;
+                // A carta está na mão. O jogador está tentando descartar outra coisa ou a própria carta (proibido se não baixou).
+                if(socket) socket.emit('erroJogo', `Você precisa baixar o ${ob.face} de ${ob.naipe} antes de descartar!`); 
+                return;
             }
         }
 
-        // Executa o descarte
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
-        console.log(`[JOGO] Jogador ${idx+1} descartou: ${carta.face}${carta.naipe} (ID: ${carta.id})`);
         
-        // --- LÓGICA DE RECOMPRA (Simplificada) ---
+        // Lógica de Recompra
         if (sala.jogo.permitirRecompra) {
-            const idEsperado = sala.jogo.idCartaRecompra;
-            console.log(`[RECOMPRA] Esperado: ${idEsperado} | Descartado: ${carta.id}`);
-            
-            // Sempre desliga a flag para não travar o jogo em loop
+            const ehACartaDaRecompra = (carta.id === sala.jogo.idCartaRecompra);
             sala.jogo.permitirRecompra = false;
             sala.jogo.primeiraCompra = false;
 
-            if (carta.id === idEsperado) {
-                console.log(">> ACERTOU RECOMPRA: Joga novamente.");
+            if (ehACartaDaRecompra) {
                 sala.estadoTurno = 'comprando';
                 io.to(sala.id).emit('statusJogo', { msg: "Descartou a carta certa! Compre novamente." });
                 broadcastEstado(sala);
-                return; // NÃO PASSA A VEZ
+                return; 
             } else {
-                console.log(">> ERROU RECOMPRA: Passa a vez.");
                 io.to(sala.id).emit('statusJogo', { msg: "Passou a vez." });
-                // Segue para passar a vez abaixo...
             }
         }
 
-        // Verifica Fim de Jogo / Morto
         if (mao.length === 0) {
             const idEq = idx % 2;
             const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
 
             if (!sala.jogo.equipePegouMorto[idEq] && temMortoDisponivel) {
                 entregarMorto(sala, idx);
-                // Pegou morto com descarte -> Passa a vez
             } else {
                 if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
                     encerrarPartida(sala, idEq);
                     return;
                 } else {
-                    // Batida inválida: Devolve carta e cancela descarte
                     mao.push(carta); 
                     sala.jogo.lixo.pop();
                     if(socket) socket.emit('erroJogo', 'Precisa de canastra para bater!');
@@ -326,7 +308,6 @@ descartarCarta: (sala, idx, indexCarta, socket) => {
             }
         }
 
-        // Passa a vez (Sentido Horário)
         sala.vez = (sala.vez + 1) % 4;
         sala.estadoTurno = 'comprando';
         
@@ -437,6 +418,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
