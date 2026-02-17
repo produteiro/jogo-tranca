@@ -188,7 +188,8 @@ const gameActions = {
             
             higienizarMaoComTresVermelhos(sala, idx);
             sala.estadoTurno = 'descartando';
-            sala.jogo.primeiraCompra = false; 
+            sala.jogo.primeiraCompra = false;
+            sala.jogo.permitirRecompra = false; // CORREÇÃO: Garante que não pede recompra após pegar lixo
             
             io.to(sala.id).emit('lixoLimpo'); 
             io.to(sala.id).emit('statusJogo', { msg: `Jogador ${idx+1} pegou o lixo!` });
@@ -204,12 +205,24 @@ const gameActions = {
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
+        // --- CORREÇÃO DO TRAVAMENTO DO LIXO ---
         if (sala.jogo.obrigacaoTopoLixo) {
-            if (!cartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo)) {
-                if(socket) socket.emit('erroJogo', "Use a carta do lixo!"); 
-                return;
+            const usouTopoID = cartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo);
+            
+            if (!usouTopoID) {
+                // Inteligência: Se o usuário baixou uma carta IGUAL (mesmo naipe/valor) mas com ID diferente, aceita também.
+                const cartaObrigacaoReal = mao.find(c => c.id === sala.jogo.obrigacaoTopoLixo);
+                const usouEquivalente = cartas.some(c => c.face === cartaObrigacaoReal.face && c.naipe === cartaObrigacaoReal.naipe);
+                
+                if (usouEquivalente) {
+                    sala.jogo.obrigacaoTopoLixo = null; // Destrava (Aceita a equivalente)
+                } else {
+                    if(socket) socket.emit('erroJogo', "Use a carta do lixo!"); 
+                    return;
+                }
+            } else {
+                sala.jogo.obrigacaoTopoLixo = null; // Destrava (Aceita a exata)
             }
-            sala.jogo.obrigacaoTopoLixo = null; 
         }
 
         const idEquipe = idx % 2;
@@ -227,16 +240,10 @@ const gameActions = {
                 sala.jogo.jogosNaMesa[idEquipe].push(jogoFinal);
             }
             
-            // --- CORREÇÃO AQUI ---
             if (mao.length === 0) {
                 const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
-                
-                if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDisponivel) {
-                    entregarMorto(sala, idx);
-                }
-                else if (temCanastra(sala.jogo.jogosNaMesa[idEquipe])) {
-                    encerrarPartida(sala, idEquipe);
-                }
+                if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDisponivel) entregarMorto(sala, idx);
+                else if (temCanastra(sala.jogo.jogosNaMesa[idEquipe])) encerrarPartida(sala, idEquipe);
             }
             
             broadcastEstado(sala);
@@ -245,10 +252,9 @@ const gameActions = {
         }
     },
 
-descartarCarta: (sala, idx, indexCarta, socket) => {
+    descartarCarta: (sala, idx, indexCarta, socket) => {
         if (sala.vez !== idx) return;
         
-        // Bloqueia descarte se tiver obrigação de justificar lixo
         if (sala.jogo.obrigacaoTopoLixo) {
             if(socket) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!"); 
             return; 
@@ -260,53 +266,32 @@ descartarCarta: (sala, idx, indexCarta, socket) => {
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
         
-        // --- LÓGICA DA PRIMEIRA COMPRA (RECOMPRA) ---
-        // Regra: Só pode comprar de novo se descartar EXATAMENTE a mesma carta comprada.
         if (sala.jogo.permitirRecompra) {
             const ehACartaDaRecompra = (carta.id === sala.jogo.idCartaRecompra);
-            
-            // Desliga a flag imediatamente para evitar loops
             sala.jogo.permitirRecompra = false;
             sala.jogo.primeiraCompra = false;
 
             if (ehACartaDaRecompra) {
-                // CENÁRIO A: Descartou a certa -> Joga de novo
                 sala.estadoTurno = 'comprando';
                 io.to(sala.id).emit('statusJogo', { msg: "Descartou a carta certa! Compre novamente." });
                 broadcastEstado(sala);
-                return; // PARA AQUI, não passa a vez
+                return; 
             } else {
-                // CENÁRIO B: Descartou outra -> Perde a chance, vida que segue
                 io.to(sala.id).emit('statusJogo', { msg: "Não descartou a carta comprada. Passou a vez." });
-                // O código continua abaixo para passar a vez...
             }
         }
 
-        // Verifica Batida (Fim de jogo ou Pegar Morto)
         if (mao.length === 0) {
             const idEq = idx % 2;
             const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
 
             if (!sala.jogo.equipePegouMorto[idEq] && temMortoDisponivel) {
                 entregarMorto(sala, idx);
-                // Quem pega o morto continua jogando (estado volta para comprando? Não, continua jogando)
-                // Na tranca, ao pegar o morto, continua baixando ou descarta. 
-                // Como acabou de descartar para bater, a vez passa para o próximo, a menos que seja batida indireta?
-                // Simplificação: Bateu para pegar morto (sem descarte) x Bateu com descarte.
-                // Aqui é COM DESCARTE. Então pega o morto e PASSA A VEZ.
-                // Mas antes, vamos garantir que o morto chegue na mão.
-                
-                // NOTA: Se bateu com descarte, pega o morto e joga no PRÓXIMO turno.
-                // Se bateu sem descarte (na mesa), joga na hora. 
-                // Como esta função é 'descartarCarta', significa que ele bateu COM descarte.
-                // Logo, ele pega o morto e a vez passa.
             } else {
-                // Tenta bater o jogo (Fim)
                 if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
                     encerrarPartida(sala, idEq);
                     return; 
                 } else {
-                    // Rejeita a batida (não tem canastra e não tem morto/já pegou)
                     mao.push(carta); 
                     sala.jogo.lixo.pop();
                     if(socket) socket.emit('erroJogo', 'Precisa de canastra para bater!');
@@ -316,10 +301,12 @@ descartarCarta: (sala, idx, indexCarta, socket) => {
             }
         }
 
-        // Passa a vez
-        sala.vez = (sala.vez + 1) % 4;
-        sala.estadoTurno = 'comprando';
+        // --- CORREÇÃO SENTIDO HORÁRIO ---
+        // (vez + 3) % 4 equivale a subtrair 1 no círculo (ir para a esquerda/horário na mesa)
+        // 0 -> 3 -> 2 -> 1 -> 0
+        sala.vez = (sala.vez + 3) % 4; 
         
+        sala.estadoTurno = 'comprando';
         broadcastEstado(sala);
         verificarVezBot(sala);
     }
@@ -462,6 +449,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
