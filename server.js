@@ -191,6 +191,8 @@ const gameActions = {
                 face: cartaTopo.face,
                 naipe: cartaTopo.naipe
             };
+
+            console.log('🔒 Obrigação definida:', sala.jogo.obrigacaoTopoLixo);
             
             higienizarMaoComTresVermelhos(sala, idx);
             sala.estadoTurno = 'descartando';
@@ -211,7 +213,7 @@ const gameActions = {
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
-        if (sala.jogo.obrigacaoTopoLixo) {
+if (sala.jogo.obrigacaoTopoLixo) {
             const ob = sala.jogo.obrigacaoTopoLixo;
             const cumpriu = cartas.some(c => 
                 c.id === ob.id || 
@@ -219,7 +221,10 @@ const gameActions = {
             );
 
             if (cumpriu) {
+                console.log('✅ Obrigação cumprida! Limpando...');
                 sala.jogo.obrigacaoTopoLixo = null; 
+            } else {
+                console.log('⚠️ Carta obrigatória não foi usada neste jogo');
             }
         }
 
@@ -255,20 +260,28 @@ const gameActions = {
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         if (!mao || !mao[indexCarta]) return;
 
-        // --- TRAVA DE SEGURANÇA INTELIGENTE ---
+// --- TRAVA DE SEGURANÇA INTELIGENTE ---
         if (sala.jogo.obrigacaoTopoLixo) {
             const ob = sala.jogo.obrigacaoTopoLixo;
-            // Se a carta da obrigação NÃO estiver mais na mão, libera o jogo.
+            
+            console.log('🔒 Verificando obrigação:', ob);
+            console.log('🃏 Mão atual:', mao.map(c => `${c.face}${c.naipe}`));
+            
+            // Verifica se a carta obrigatória ainda está na mão
             const cartaAindaNaMao = mao.find(c => 
                 c.id === ob.id || 
                 (c.face === ob.face && c.naipe === ob.naipe)
             );
 
-            if (!cartaAindaNaMao) {
-                sala.jogo.obrigacaoTopoLixo = null; 
-            } else {
-                if(socket) socket.emit('erroJogo', `Você precisa baixar o ${ob.face} de ${ob.naipe} antes de descartar!`); 
+            if (cartaAindaNaMao) {
+                // Carta ainda na mão - BLOQUEIA
+                console.log('❌ Carta obrigatória ainda na mão!');
+                if(socket) socket.emit('erroJogo', `Você precisa baixar o ${ob.face} de ${ob.naipe} antes de descartar!`);
                 return;
+            } else {
+                // Carta não está mais na mão - já foi jogada - LIBERA
+                console.log('✅ Carta obrigatória já foi jogada. Liberando...');
+                sala.jogo.obrigacaoTopoLixo = null; 
             }
         }
 
@@ -423,6 +436,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
