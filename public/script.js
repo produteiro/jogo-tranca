@@ -201,6 +201,16 @@ function atualizarMesa(sala) {
     
     // 8. ATUALIZA BOTÕES DE AÇÃO
     atualizarBotoesAcao(estado);
+
+    // 7. CORREÇÃO MORTOS: Esconde se o array estiver vazio
+    const elMorto1 = document.getElementById('morto1');
+    const elMorto2 = document.getElementById('morto2');
+    
+    if (elMorto1) elMorto1.style.display = (sala.jogo.morto1 && sala.jogo.morto1.length > 0) ? 'block' : 'none';
+    if (elMorto2) elMorto2.style.display = (sala.jogo.morto2 && sala.jogo.morto2.length > 0) ? 'block' : 'none';
+    
+    // ...
+}
 }
 
 // ==========================================
@@ -274,10 +284,33 @@ function atualizarLixo(sala, estado) {
     
     divLixo.innerHTML = '';
     
-    // Remove eventos antigos para evitar duplicidade e limpa estilos
+    // Limpa eventos anteriores
     areaLixo.onclick = null;
     areaLixo.classList.remove('ativo-brilhando');
 
+    // LÓGICA DE INTERAÇÃO (COMPRAR OU DESCARTAR)
+    areaLixo.onclick = () => {
+        if (!turnoAtivo) return;
+
+        // Caso 1: Comprar Lixo
+        if (estado === 'comprando' && qtd > 0) {
+            console.log('🗑️ Pegando lixo...');
+            socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
+        }
+        // Caso 2: Descartar no Lixo (CORREÇÃO DE USABILIDADE)
+        else if (estado === 'descartando') {
+            if (cartasSelecionadas.length === 1) {
+                console.log('🗑️ Descartando carta:', cartasSelecionadas[0]);
+                socket.emit('jogada', { acao: 'descartar', dados: { index: cartasSelecionadas[0] } });
+                cartasSelecionadas = []; // Limpa seleção
+                atualizarVisualSelecao();
+            } else {
+                alert("Selecione 1 carta para descartar clicando nela.");
+            }
+        }
+    };
+
+    // Renderização Visual
     if (qtd > 0) {
         const topo = sala.jogo.lixo[qtd - 1];
         const cartaDiv = document.createElement('div');
@@ -285,18 +318,13 @@ function atualizarLixo(sala, estado) {
         cartaDiv.innerHTML = `<img src="${getImgUrl(topo)}">`;
         divLixo.appendChild(cartaDiv);
         
-        // Destaque e Clique se puder pegar
+        // Brilho apenas se puder comprar
         if (turnoAtivo && estado === 'comprando') {
             areaLixo.classList.add('ativo-brilhando');
-            
-            // CORREÇÃO 1: Envia o evento no formato correto que o servidor espera
-            areaLixo.onclick = () => {
-                console.log('🗑️ Pegando lixo...');
-                socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
-            };
         }
     } else {
-        divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:14px; padding:20px;">LIXO VAZIO</div>';
+        // Se estiver vazio, mas for hora de descartar, permite clique (área vazia)
+        divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:14px; padding:20px;">LIXO</div>';
     }
 }
 
@@ -733,12 +761,15 @@ socket.on('cartaComprada', (dados) => {
     }
 });
 
+// CORREÇÃO: Acessa a propriedade .total para evitar [object Object]
 socket.on('atualizarPlacar', (placar) => {
     console.log('📊 Placar atualizado:', placar);
     const elNos = document.getElementById('pts-nos');
     const elEles = document.getElementById('pts-eles');
-    if (elNos) elNos.innerText = placar.p1 || 0;
-    if (elEles) elEles.innerText = placar.p2 || 0;
+    
+    // Verifica se placar.p1 existe e acessa .total, senão usa 0
+    if (elNos) elNos.innerText = placar.p1?.total || 0;
+    if (elEles) elEles.innerText = placar.p2?.total || 0;
 });
 
 socket.on('atualizarContadores', (dados) => {
@@ -809,6 +840,7 @@ socket.on('fimDeJogo', (dados) => {
 });
 
 console.log('✅ Script carregado com sucesso!');
+
 
 
 
