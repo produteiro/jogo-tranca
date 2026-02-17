@@ -1013,3 +1013,194 @@ body::after {
     display: none !important;
     pointer-events: none;
 }
+/* --- RESET BÁSICO --- */
+* {
+    box-sizing: border-box;
+    touch-action: manipulation; /* Melhora resposta ao toque */
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Evita scroll duplo */
+    background-color: #0f172a;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* --- CONTAINER PRINCIPAL (MESA) --- */
+#mesa {
+    display: none; /* Controlado pelo JS */
+    flex-direction: column;
+    width: 100%;
+    height: 100%; /* Ocupa a tela toda */
+    overflow-y: auto; /* IMPORTANTE: Permite rolar se o conteúdo for maior que a tela */
+    overflow-x: hidden;
+    padding-bottom: 80px; /* Espaço para a mão não cobrir o final */
+}
+
+/* --- ÁREAS DO JOGO --- */
+/* Distribuição vertical flexível */
+#info-jogo, #placar {
+    flex-shrink: 0; /* Não encolhe, sempre visível */
+    padding: 10px;
+    text-align: center;
+}
+
+/* Adversários (Topo) */
+.area-superior {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+    flex-wrap: wrap; /* Permite quebrar linha em telas muito pequenas */
+    min-height: 120px;
+}
+
+/* Centro (Monte, Lixo, Mortos e Jogos Baixados) */
+.area-centro {
+    display: flex;
+    flex-direction: column; /* Organiza em colunas para garantir espaço */
+    gap: 20px;
+    padding: 15px;
+    flex-grow: 1; /* Ocupa o espaço disponível */
+    justify-content: center;
+}
+
+.centro-mesa {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap; /* Quebra linha se os elementos forem grandes demais */
+    margin-bottom: 20px;
+}
+
+/* Área onde ficam os jogos baixados (Nós e Eles) */
+.area-jogos-baixados {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    gap: 10px;
+    flex-wrap: wrap; /* CRUCIAL: Se tiver muitos jogos, quebra linha */
+}
+
+.container-jogos {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px;
+    min-height: 120px; /* Garante altura mínima para clique */
+    width: 45%;
+    min-width: 300px; /* Não fica menor que isso */
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 5px;
+    border: 1px dashed rgba(255,255,255,0.2);
+}
+
+/* --- CARTAS (Responsividade) --- */
+.carta {
+    width: 80px;  /* Tamanho base */
+    height: 112px;
+    position: relative;
+    transition: transform 0.2s;
+}
+
+.carta img {
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+}
+
+/* --- MINHA MÃO (Fixa embaixo, mas ajustável) --- */
+.area-inferior {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(to top, #0f172a 90%, transparent);
+    padding: 10px 10px 20px 10px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+}
+
+#minha-mao {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap; /* Permite quebrar linha se tiver muitas cartas */
+    gap: -30px; /* Sobreposição das cartas */
+    margin-bottom: 10px;
+    max-width: 100%;
+    overflow-x: auto; /* Scroll horizontal se tiver cartas demais */
+    padding-left: 20px; /* Espaço para scroll */
+}
+
+#minha-mao .carta {
+    margin-right: -35px; /* Efeito leque */
+    cursor: pointer;
+}
+
+#minha-mao .carta:hover, #minha-mao .carta.selecionada {
+    transform: translateY(-20px);
+    z-index: 10;
+}
+
+/* --- BOTÕES DE AÇÃO --- */
+#barra-ferramentas {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap; /* Botões quebram linha se o texto for grande (acessibilidade) */
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    padding: 8px;
+    border-radius: 20px;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 1rem; /* Usa REM para respeitar configuração do navegador */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    white-space: nowrap; /* Evita que o texto do botão quebre dentro dele */
+}
+
+/* --- MEDIA QUERIES (Ajustes para telas pequenas/celulares) --- */
+@media (max-width: 768px) {
+    .carta {
+        width: 60px;
+        height: 84px;
+    }
+    
+    #minha-mao .carta {
+        margin-right: -25px;
+    }
+
+    .container-jogos {
+        width: 100%; /* Ocupa largura total no celular */
+        min-height: 100px;
+    }
+    
+    .centro-mesa {
+        gap: 10px;
+    }
+    
+    /* Ajusta botões para mobile */
+    #barra-ferramentas button {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+    
+    /* Garante que a área inferior não coma a tela toda */
+    .area-inferior {
+        max-height: 40vh; /* Máximo 40% da tela */
+        overflow-y: auto;
+    }
+}
