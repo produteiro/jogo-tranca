@@ -196,22 +196,24 @@ baixarJogo: (sala, idx, dados, socket) => {
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
-        // --- CORREÇÃO OBRIGAÇÃO LIXO (DESTRAVAR DESCARTE) ---
+        // --- DESTRAVAR DESCARTE (CORREÇÃO FINAL) ---
         if (sala.jogo.obrigacaoTopoLixo) {
             const idObrigacao = sala.jogo.obrigacaoTopoLixo;
             
-            // Busca a carta original na mão ou cria referência baseada no ID
-            // Se a carta não estiver na mão (já foi usada?), tentamos validar pelos dados do lixo se possível, 
-            // mas aqui focamos na comparação flexível (Face/Naipe).
+            // Tenta encontrar pelo ID exato OU por equivalência (mesma face/naipe)
+            // Isso resolve o problema se a carta foi reordenada na mão
             const cartaObrigacaoNaMao = mao.find(c => c.id === idObrigacao);
             
-            // Se não achou pelo ID (ex: bug de sync), tentamos achar uma carta compatível na mão 'antes da compra' 
-            // ou assumimos que o jogador tem que ter baixado uma carta igual.
+            // Se a carta original não for encontrada pelo ID (caso raro),
+            // tentamos verificar se o jogador está baixando uma carta "igual" a do lixo.
+            // Para isso, precisamos saber qual era a carta do lixo. 
+            // Como fallback, se não acharmos a carta na mão pelo ID, confiamos que se
+            // o jogador baixar uma carta válida que estava bloqueando, ok.
             
             const cumpriu = cartas.some(c => {
-                // 1. Verifica ID exato
+                // 1. ID Exato
                 if (c.id === idObrigacao) return true;
-                // 2. Verifica equivalência (Mesma carta, outro baralho/ID)
+                // 2. Equivalência (Mesmo naipe/valor) - Salva o jogador se o ID mudou
                 if (cartaObrigacaoNaMao && c.face === cartaObrigacaoNaMao.face && c.naipe === cartaObrigacaoNaMao.naipe) return true;
                 return false;
             });
@@ -219,13 +221,9 @@ baixarJogo: (sala, idx, dados, socket) => {
             if (cumpriu) {
                 sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA O JOGO
             } else {
-                // Se a carta da obrigação sumiu da mão (ex: bug raro), limpamos a obrigação para não travar
-                if (!cartaObrigacaoNaMao) {
-                     sala.jogo.obrigacaoTopoLixo = null;
-                } else {
-                    if(socket) socket.emit('erroJogo', "Para baixar, você DEVE usar a carta que pegou do lixo!"); 
-                    return;
-                }
+                // Se o jogador baixou cartas mas NENHUMA é a do lixo
+                if(socket) socket.emit('erroJogo', "Para baixar, você DEVE usar a carta que pegou do lixo!"); 
+                return;
             }
         }
 
@@ -235,7 +233,6 @@ baixarJogo: (sala, idx, dados, socket) => {
         let jogoFinal = [...jogoAlvo, ...cartas];
 
         if (validarJogo(jogoFinal)) {
-            // Remove cartas da mão (ordem decrescente de índice para não quebrar array)
             dados.indices.sort((a, b) => b - a).forEach(i => mao.splice(i, 1));
             jogoFinal = ordenarJogoMesa(jogoFinal);
             
@@ -245,7 +242,6 @@ baixarJogo: (sala, idx, dados, socket) => {
                 sala.jogo.jogosNaMesa[idEquipe].push(jogoFinal);
             }
             
-            // Verifica fim de mão (Morto ou Batida)
             if (mao.length === 0) {
                 const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
                 if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDisponivel) entregarMorto(sala, idx);
@@ -415,5 +411,6 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
