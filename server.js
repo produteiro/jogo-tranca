@@ -121,12 +121,12 @@ const iniciarNovaRodada = (sala) => {
     console.log(`[SALA ${sala.id}] Iniciando nova rodada...`);
     sala.jogo = prepararPartida();
     
-    // CORREÇÃO: Sorteia quem começa (0 a 3) para dar chance de compra dupla a todos
+    // CORREÇÃO: Sorteia aleatoriamente quem começa (0 a 3)
     sala.vez = Math.floor(Math.random() * 4); 
     
     sala.estadoTurno = 'comprando';
     sala.jogo.primeiraCompra = true;
-    sala.jogo.primeiraCompraJogador = sala.vez; // O sorteado tem o direito da compra dupla
+    sala.jogo.primeiraCompraJogador = sala.vez; 
 
     // Higieniza mãos iniciais
     for(let i=0; i<4; i++) higienizarMaoComTresVermelhos(sala, i);
@@ -134,8 +134,180 @@ const iniciarNovaRodada = (sala) => {
     io.to(sala.id).emit('statusJogo', { msg: `--- NOVA PARTIDA! O Jogador ${sala.vez + 1} começa ---` });
     broadcastEstado(sala);
     
-    // Se o sorteado for Bot, ele joga
     verificarVezBot(sala);
+};
+
+const gameActions = {
+    comprarDoMonte: (sala, idx, socket) => {
+        if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
+        
+        if (sala.jogo.monte.length === 0) {
+            if (!garantirMonteDisponivel(sala)) return; 
+        }
+    
+        const ehPrimeiraCompra = sala.jogo.primeiraCompra && sala.jogo.primeiraCompraJogador === idx;
+        const carta = sala.jogo.monte.pop();
+        
+        if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
+        
+        sala.jogo[`maoJogador${idx + 1}`].push(carta);
+        higienizarMaoComTresVermelhos(sala, idx);
+        
+        sala.estadoTurno = 'descartando';
+        
+        if (ehPrimeiraCompra) {
+            sala.jogo.permitirRecompra = true;
+            sala.jogo.idCartaRecompra = carta.id; // Salva o ID para validação exata
+            io.to(sala.id).emit('statusJogo', { msg: "Primeira compra! Descarte esta mesma carta para comprar de novo." });
+        }
+
+        io.to(sala.jogadores[idx]).emit('cartaComprada', { cartaId: carta.id }); 
+        broadcastEstado(sala);
+    },
+
+    comprarLixo: (sala, idx, indices, socket) => {
+        if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
+        if (sala.jogo.lixo.length === 0) return;
+        
+        const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
+        if (cartaTopo.face === '3' && (['paus','espadas'].includes(cartaTopo.naipe))) {
+            if(socket) socket.emit('erroJogo', 'Lixo trancado!');
+            return;
+        }
+
+        const mao = sala.jogo[`maoJogador${idx + 1}`];
+        const jogosMesa = sala.jogo.jogosNaMesa[idx%2];
+        
+        if (verificarPossibilidadeCompra(mao, cartaTopo, jogosMesa)) {
+            const lixo = sala.jogo.lixo.splice(0);
+            sala.jogo[`maoJogador${idx + 1}`] = mao.concat(lixo);
+            sala.jogo.obrigacaoTopoLixo = cartaTopo.id;
+            sala.jogo.idsMaoAntesDaCompra = mao.map(c => c.id);
+            
+            higienizarMaoComTresVermelhos(sala, idx);
+            sala.estadoTurno = 'descartando';
+            sala.jogo.primeiraCompra = false; 
+            sala.jogo.permitirRecompra = false; // Comprou lixo, perde chance de recompra
+            
+            io.to(sala.id).emit('lixoLimpo'); 
+            io.to(sala.id).emit('statusJogo', { msg: `Jogador ${idx+1} pegou o lixo!` });
+            
+            broadcastEstado(sala);
+        } else {
+            if(socket) socket.emit('erroJogo', 'Precisa justificar o lixo!');
+        }
+    },
+
+    baixarJogo: (sala, idx, dados, socket) => {
+        if (sala.vez !== idx) return; 
+        const mao = sala.jogo[`maoJogador${idx + 1}`];
+        const cartas = dados.indices.map(i => mao[i]);
+
+        if (sala.jogo.obrigacaoTopoLixo) {
+            // Verifica se usou a carta exata ou uma equivalente (mesmo naipe/valor)
+            const idObrigacao = sala.jogo.obrigacaoTopoLixo;
+            const cartaObrigacao = mao.find(c => c.id === idObrigacao);
+            
+            const cumpriu = cartas.some(c => 
+                c.id === idObrigacao || 
+                (cartaObrigacao && c.face === cartaObrigacao.face && c.naipe === cartaObrigacao.naipe)
+            );
+
+            if (!cumpriu) {
+                if(socket) socket.emit('erroJogo', "Use a carta do lixo!"); 
+                return;
+            }
+            sala.jogo.obrigacaoTopoLixo = null; 
+        }
+
+        const idEquipe = idx % 2;
+        let jogoAlvo = (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) 
+                       ? sala.jogo.jogosNaMesa[idEquipe][dados.indexJogoMesa] : [];
+        let jogoFinal = [...jogoAlvo, ...cartas];
+
+        if (validarJogo(jogoFinal)) {
+            dados.indices.sort((a, b) => b - a).forEach(i => mao.splice(i, 1));
+            jogoFinal = ordenarJogoMesa(jogoFinal);
+            
+            if (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) {
+                sala.jogo.jogosNaMesa[idEquipe][dados.indexJogoMesa] = jogoFinal;
+            } else {
+                sala.jogo.jogosNaMesa[idEquipe].push(jogoFinal);
+            }
+            
+            if (mao.length === 0) {
+                const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
+                if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDisponivel) entregarMorto(sala, idx);
+                else if (temCanastra(sala.jogo.jogosNaMesa[idEquipe])) encerrarPartida(sala, idEquipe);
+            }
+            
+            broadcastEstado(sala);
+        } else {
+            if(socket) socket.emit('erroJogo', 'Jogo inválido.');
+        }
+    },
+
+    descartarCarta: (sala, idx, indexCarta, socket) => {
+        if (sala.vez !== idx) return;
+        if (sala.jogo.obrigacaoTopoLixo) {
+            if(socket) socket.emit('erroJogo', "Use a carta do lixo antes de descartar!"); 
+            return; 
+        }
+
+        const mao = sala.jogo[`maoJogador${idx + 1}`];
+        if (!mao || !mao[indexCarta]) return;
+
+        const carta = mao.splice(indexCarta, 1)[0];
+        sala.jogo.lixo.push(carta);
+        
+        // --- LÓGICA DE RECOMPRA CORRIGIDA ---
+        if (sala.jogo.permitirRecompra) {
+            const acertouCarta = (carta.id === sala.jogo.idCartaRecompra);
+            
+            // Sempre desativa a flag para evitar loops infinitos
+            sala.jogo.permitirRecompra = false;
+            sala.jogo.primeiraCompra = false;
+
+            if (acertouCarta) {
+                sala.estadoTurno = 'comprando'; // Mantém a vez
+                io.to(sala.id).emit('statusJogo', { msg: "Descartou a carta certa! Compre novamente." });
+                broadcastEstado(sala);
+                return; // NÃO passa a vez
+            } else {
+                io.to(sala.id).emit('statusJogo', { msg: "Descarte normal. Passando a vez." });
+                // Segue o código para passar a vez...
+            }
+        }
+
+        // Verifica Batida
+        if (mao.length === 0) {
+            const idEq = idx % 2;
+            const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
+
+            if (!sala.jogo.equipePegouMorto[idEq] && temMortoDisponivel) {
+                entregarMorto(sala, idx);
+                // Pegou morto com descarte, a vez passa
+            } else {
+                if (temCanastra(sala.jogo.jogosNaMesa[idEq])) {
+                    encerrarPartida(sala, idEq);
+                    return; 
+                } else {
+                    mao.push(carta); 
+                    sala.jogo.lixo.pop();
+                    if(socket) socket.emit('erroJogo', 'Precisa de canastra para bater!');
+                    broadcastEstado(sala);
+                    return;
+                }
+            }
+        }
+
+        // Passa a vez
+        sala.vez = (sala.vez + 1) % 4; 
+        sala.estadoTurno = 'comprando';
+        
+        broadcastEstado(sala);
+        verificarVezBot(sala);
+    }
 };
 
 // --- AÇÕES DO JOGO ---
@@ -449,6 +621,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
