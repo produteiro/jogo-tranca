@@ -468,18 +468,28 @@ function atualizarBotoesAcao(estado) {
 }
 
 function acaoDescartar() {
-    if (!turnoAtivo) return;
+    if (!turnoAtivo) {
+        console.log('❌ Não é sua vez');
+        return;
+    }
+    
     if (cartasSelecionadas.length !== 1) {
         alert("Selecione 1 carta para descartar.");
         return;
     }
     
-    socket.emit('jogada', { acao: 'descartar', dados: { index: cartasSelecionadas[0] } });
+    console.log('🗑️ Descartando carta index:', cartasSelecionadas[0]);
     
-    // CORREÇÃO: Limpa destaque e seleção imediatamente
+    // CORREÇÃO: Envia o formato exato que o server.js espera no ouvinte 'jogada'
+    socket.emit('jogada', { 
+        acao: 'descartar', 
+        dados: { index: cartasSelecionadas[0] } 
+    });
+    
+    // Limpa seleção visual imediatamente
     cartasSelecionadas = [];
+    atualizarVisualSelecao();
     ultimaCartaCompradaId = null;
-    atualizarMesa(ultimoEstadoSala); // Re-renderiza para remover brilho
 }
 
 function acaoBaixar() {
@@ -604,3 +614,4 @@ window.tentarBaixarJogo = acaoBaixar;
 window.descartarCartaSelecionadas = acaoDescartar;
 window.limparSelecao = acaoLimpar;
 window.alternarOrdenacao = acaoOrdenar;
+
