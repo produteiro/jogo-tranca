@@ -138,22 +138,34 @@ const gameActions = {
         }
     
         const ehPrimeiraCompra = sala.jogo.primeiraCompra && sala.jogo.primeiraCompraJogador === idx;
-        const carta = sala.jogo.monte.pop();
+        
+        // 1. CAPTURA O ESTADO DA MÃO ANTES (Para detectar trocas de 3 Vermelho)
+        const idsAntes = new Set(sala.jogo[`maoJogador${idx + 1}`].map(c => c.id));
+
+        const cartaOriginal = sala.jogo.monte.pop();
         
         if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
         
-        sala.jogo[`maoJogador${idx + 1}`].push(carta);
+        sala.jogo[`maoJogador${idx + 1}`].push(cartaOriginal);
+        
+        // Essa função pode trocar a carta se for 3 Vermelho e reordenar a mão!
         higienizarMaoComTresVermelhos(sala, idx);
         
         sala.estadoTurno = 'descartando';
         
+        // 2. IDENTIFICA A CARTA REAL QUE FICOU NA MÃO
+        const maoAtual = sala.jogo[`maoJogador${idx + 1}`];
+        const cartaRealNaMao = maoAtual.find(c => !idsAntes.has(c.id)) || cartaOriginal;
+
         if (ehPrimeiraCompra) {
             sala.jogo.permitirRecompra = true;
-            sala.jogo.idCartaRecompra = carta.id;
+            // Salva o ID da carta que REALMENTE entrou na mão (não a original se foi trocada)
+            sala.jogo.idCartaRecompra = cartaRealNaMao.id;
             io.to(sala.id).emit('statusJogo', { msg: "Primeira compra! Descarte esta mesma carta para comprar de novo." });
         }
 
-        io.to(sala.jogadores[idx]).emit('cartaComprada', { cartaId: carta.id }); 
+        // Avisa o cliente para destacar a carta correta
+        io.to(sala.jogadores[idx]).emit('cartaComprada', { cartaId: cartaRealNaMao.id }); 
         broadcastEstado(sala);
     },
 
@@ -174,7 +186,6 @@ const gameActions = {
             const todoLixo = sala.jogo.lixo.splice(0);
             sala.jogo[`maoJogador${idx + 1}`] = mao.concat(todoLixo);
             
-            // GRAVA OBRIGAÇÃO COMPLETA: ID, Face e Naipe para conferência à prova de falhas
             sala.jogo.obrigacaoTopoLixo = {
                 id: cartaTopo.id,
                 face: cartaTopo.face,
@@ -200,20 +211,16 @@ const gameActions = {
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
-        // --- VERIFICAÇÃO FLEXÍVEL AO BAIXAR ---
         if (sala.jogo.obrigacaoTopoLixo) {
             const ob = sala.jogo.obrigacaoTopoLixo;
-            
-            // Verifica se a carta baixada é a do lixo (ID ou Face/Naipe igual)
             const cumpriu = cartas.some(c => 
                 c.id === ob.id || 
                 (c.face === ob.face && c.naipe === ob.naipe)
             );
 
             if (cumpriu) {
-                sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA OBRIGAÇÃO
+                sala.jogo.obrigacaoTopoLixo = null; 
             }
-            // OBS: Mesmo se não destravar aqui, a função descartarCarta fará a verificação final na mão.
         }
 
         const idEquipe = idx % 2;
@@ -248,22 +255,18 @@ const gameActions = {
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         if (!mao || !mao[indexCarta]) return;
 
-        // --- CORREÇÃO DEFINITIVA (A "CURA" DO PROBLEMA) ---
-        // Antes de bloquear o descarte, verificamos se a carta que travava o jogo AINDA ESTÁ NA MÃO.
-        // Se ela não estiver na mão, significa que o jogador já baixou (mesmo que a flag ob não tenha limpado).
+        // --- TRAVA DE SEGURANÇA INTELIGENTE ---
         if (sala.jogo.obrigacaoTopoLixo) {
             const ob = sala.jogo.obrigacaoTopoLixo;
-            
+            // Se a carta da obrigação NÃO estiver mais na mão, libera o jogo.
             const cartaAindaNaMao = mao.find(c => 
                 c.id === ob.id || 
                 (c.face === ob.face && c.naipe === ob.naipe)
             );
 
             if (!cartaAindaNaMao) {
-                // A carta SUMIU da mão (foi baixada). Problema resolvido.
                 sala.jogo.obrigacaoTopoLixo = null; 
             } else {
-                // A carta está na mão. O jogador está tentando descartar outra coisa ou a própria carta (proibido se não baixou).
                 if(socket) socket.emit('erroJogo', `Você precisa baixar o ${ob.face} de ${ob.naipe} antes de descartar!`); 
                 return;
             }
@@ -272,9 +275,11 @@ const gameActions = {
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
         
-        // Lógica de Recompra
+        // --- RECOMPRA ---
         if (sala.jogo.permitirRecompra) {
             const ehACartaDaRecompra = (carta.id === sala.jogo.idCartaRecompra);
+            
+            // Sempre desativa para o próximo turno
             sala.jogo.permitirRecompra = false;
             sala.jogo.primeiraCompra = false;
 
@@ -282,7 +287,7 @@ const gameActions = {
                 sala.estadoTurno = 'comprando';
                 io.to(sala.id).emit('statusJogo', { msg: "Descartou a carta certa! Compre novamente." });
                 broadcastEstado(sala);
-                return; 
+                return; // NÃO PASSA A VEZ
             } else {
                 io.to(sala.id).emit('statusJogo', { msg: "Passou a vez." });
             }
@@ -418,6 +423,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
