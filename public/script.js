@@ -331,10 +331,43 @@ socket.on('receberChat', (dados) => {
 });
 
 socket.on('fimDeJogo', (dados) => {
+    console.log('🏁 FIM DE JOGO:', dados);
     const modal = document.getElementById('modal-fim');
-    if(modal) {
-        modal.style.display = 'flex';
-        // Preencher placar final se necessário
+    if (!modal) return;
+    
+    modal.style.display = 'flex';
+    
+    // Função para preencher as colunas (p1 = Nós, p2 = Eles)
+    const preencher = (prefixo, d) => {
+        const setTxt = (id, val) => {
+            const el = document.getElementById(id);
+            if(el) el.innerText = val;
+        };
+
+        if (!d) return;
+
+        setTxt(prefixo + '-batida', d.ptsBatida || 0);
+        setTxt(prefixo + '-morto', d.ptsMorto || 0);
+        setTxt(prefixo + '-limpa', d.ptsCanastrasLimpas || 0);
+        setTxt(prefixo + '-suja', d.ptsCanastrasSujas || 0);
+        setTxt(prefixo + '-3ver', d.pts3Vermelhos || 0);
+        
+        // Soma pontos das cartas na mão (negativo) + mesa (positivo)
+        const totalCartas = (d.ptsCartasMao || 0) + (d.ptsCartasMesa || 0);
+        setTxt(prefixo + '-cartas', totalCartas);
+    };
+
+    if (dados.detalhes) {
+        preencher('p1', dados.detalhes.p1);
+        preencher('p2', dados.detalhes.p2);
+    }
+    
+    if (dados.placar) {
+        const elTotalP1 = document.getElementById('p1-total');
+        const elTotalP2 = document.getElementById('p2-total');
+        if(elTotalP1) elTotalP1.innerText = dados.placar.p1;
+        if(elTotalP2) elTotalP2.innerText = dados.placar.p2;
     }
 });
+
 
