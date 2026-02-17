@@ -247,24 +247,22 @@ const gameActions = {
         }
     },
 
-    descartarCarta: (sala, idx, indexCarta, socket) => {
+descartarCarta: (sala, idx, indexCarta, socket) => {
         if (sala.vez !== idx) return;
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         if (!mao || !mao[indexCarta]) return;
 
-        // --- CORREÇÃO DEFINITIVA (TRAVA DE SEGURANÇA) ---
-        // Se o jogo diz que tem obrigação, mas a carta NÃO está na mão, destrava automaticamente.
+        // --- CORREÇÃO DE SEGURANÇA ---
+        // Se o jogo acha que tem obrigação, mas a carta não está na mão, destrava.
         if (sala.jogo.obrigacaoTopoLixo) {
             const idObrigacao = sala.jogo.obrigacaoTopoLixo;
             const cartaAindaNaMao = mao.find(c => c.id === idObrigacao);
 
             if (!cartaAindaNaMao) {
-                // OPA! O jogador não tem mais a carta. Já deve ter baixado.
-                // Limpa o erro silenciosamente e permite o descarte.
+                // Carta sumiu (já foi baixada?), libera o jogo
                 sala.jogo.obrigacaoTopoLixo = null;
             } else {
-                // A carta ainda está na mão. O jogador tem que baixar ela antes de descartar.
-                if(socket) socket.emit('erroJogo', "Você precisa baixar a carta do lixo antes de descartar!"); 
+                if(socket) socket.emit('erroJogo', "Baixe a carta do lixo antes de descartar!"); 
                 return;
             }
         }
@@ -272,6 +270,7 @@ const gameActions = {
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
         
+        // Recompra
         if (sala.jogo.permitirRecompra) {
             const ehACartaDaRecompra = (carta.id === sala.jogo.idCartaRecompra);
             sala.jogo.permitirRecompra = false;
@@ -417,6 +416,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
