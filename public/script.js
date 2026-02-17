@@ -61,16 +61,14 @@ socket.on('cartaComprada', (dados) => {
 function atualizarMesa(sala) {
     if (!sala || !sala.jogo) return;
 
-    // Identificação do Jogador
     meuIndex = sala.jogadores.findIndex(id => id === socket.id);
     if (meuIndex === -1 && sala.donos) meuIndex = sala.donos.findIndex(id => id === socket.id);
-    // Fallback para modo treino se não achar ID
     if (meuIndex === -1) meuIndex = 0;
 
     turnoAtivo = (sala.vez === meuIndex);
     const estado = sala.estadoTurno;
 
-    // 1. Header e Status
+    // 1. Header
     const info = document.getElementById('info-jogo');
     if(info) {
         const nomeVez = (sala.vez === meuIndex) ? "SUA VEZ" : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
@@ -78,58 +76,45 @@ function atualizarMesa(sala) {
         info.style.color = turnoAtivo ? '#f1c40f' : '#fff';
     }
 
-    // 2. Placar (Usa dados calculados do servidor)
+    // 2. Placar
     if (sala.placarCalculado) {
         const idEq = meuIndex % 2;
         const ptsNos = (idEq === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
         const ptsEles = (idEq === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
         
-        document.getElementById('pts-nos').innerText = ptsNos;
-        document.getElementById('pts-eles').innerText = ptsEles;
+        const elNos = document.getElementById('pts-nos');
+        const elEles = document.getElementById('pts-eles');
+        if(elNos) elNos.innerText = ptsNos;
+        if(elEles) elEles.innerText = ptsEles;
     }
 
-    // 3. Componentes da Mesa
+    // 3. Mesa
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
 
-    // 4. Adversários (Correção do Sumiço)
-    const counts = sala.maosCount || [0,0,0,0];
-    const idxP = (meuIndex + 2) % 4; // Parceiro
-    const idxE = (meuIndex + 3) % 4; // Esquerda (Anterior)
-    const idxD = (meuIndex + 1) % 4; // Direita (Próximo)
-    
-    desenharMaoAdversario('mao-topo', counts[idxP]);
-    desenharMaoAdversario('mao-esquerda', counts[idxE]);
-    desenharMaoAdversario('mao-direita', counts[idxD]);
-
-    // ... (código anterior dentro de atualizarMesa)
-
-    // 4. Adversários (CORREÇÃO SENTIDO HORÁRIO)
+    // 4. Adversários (CORRIGIDO: Sentido Horário e Erro de Sintaxe 'counts')
     const counts = sala.maosCount || [0,0,0,0];
     
-    // SENTIDO HORÁRIO: O próximo jogador (meuIndex + 1) fica à ESQUERDA
-    const idxE = (meuIndex + 1) % 4; // Esquerda (Próximo a jogar)
-    const idxP = (meuIndex + 2) % 4; // Topo (Parceiro)
-    const idxD = (meuIndex + 3) % 4; // Direita (Anterior)
+    // SENTIDO HORÁRIO:
+    // Eu (0) -> Direita (1) -> Topo (2) -> Esquerda (3)
+    const idxDireita  = (meuIndex + 1) % 4; // Próximo a jogar
+    const idxTopo     = (meuIndex + 2) % 4; // Parceiro
+    const idxEsquerda = (meuIndex + 3) % 4; // Anterior
     
-    desenharMaoAdversario('mao-topo', counts[idxP]);
-    desenharMaoAdversario('mao-esquerda', counts[idxE]);
-    desenharMaoAdversario('mao-direita', counts[idxD]);
-
-    // ... (restante da função)
+    desenharMaoAdversario('mao-direita', counts[idxDireita]);
+    desenharMaoAdversario('mao-topo', counts[idxTopo]);
+    desenharMaoAdversario('mao-esquerda', counts[idxEsquerda]);
 
     // 5. Minha Mão
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
-    // 6. Jogos na Mesa
+    // 6. Jogos
     const idEq = meuIndex % 2;
     renderizarJogos('meus-jogos', sala.jogo.jogosNaMesa[idEq], true);
     renderizarJogos('jogos-adversarios', sala.jogo.jogosNaMesa[(idEq + 1) % 2], false);
     
-    // 7. 3 Vermelhos
+    // 7. Extras
     renderizarTresVermelhos(sala);
-    
-    // 8. Botões
     atualizarBotoesAcao(estado);
 }
 
@@ -385,6 +370,7 @@ socket.on('fimDeJogo', (dados) => {
         if(elTotalP2) elTotalP2.innerText = dados.placar.p2;
     }
 });
+
 
 
 
