@@ -49,7 +49,6 @@ const garantirMonteDisponivel = (sala) => {
     if (sala.jogo.morto1.length > 0) {
         novoMonte = sala.jogo.morto1;
         sala.jogo.morto1 = []; 
-        // Nota: Não marcamos equipePegouMorto aqui, pois foi para o monte
         io.to(sala.id).emit('statusJogo', { msg: "Morto 1 virou monte!" });
     } else if (sala.jogo.morto2.length > 0) {
         novoMonte = sala.jogo.morto2;
@@ -79,7 +78,6 @@ const higienizarMaoComTresVermelhos = (sala, idxJogador) => {
             
             tresEncontrados.forEach(c => {
                 sala.jogo.tresVermelhos[idEquipe].push(c);
-                io.to(sala.id).emit('receberChat', { idJogador: -1, msg: `Jogador ${idxJogador+1} trocou 3 Vermelho.`, sistema: true });
             });
             
             mao = novaMao;
@@ -106,7 +104,7 @@ const iniciarNovaRodada = (sala) => {
     console.log(`[SALA ${sala.id}] Iniciando nova rodada...`);
     sala.jogo = prepararPartida();
     
-    // Sorteia quem começa (0 a 3)
+    // Aleatoriedade no início (0 a 3)
     sala.vez = Math.floor(Math.random() * 4); 
     
     sala.estadoTurno = 'comprando';
@@ -142,7 +140,7 @@ const gameActions = {
         
         if (ehPrimeiraCompra) {
             sala.jogo.permitirRecompra = true;
-            sala.jogo.idCartaRecompra = carta.id; // Salva ID para validar descarte exato
+            sala.jogo.idCartaRecompra = carta.id;
             io.to(sala.id).emit('statusJogo', { msg: "Primeira compra! Descarte esta mesma carta para comprar de novo." });
         }
 
@@ -172,8 +170,8 @@ const gameActions = {
             
             higienizarMaoComTresVermelhos(sala, idx);
             sala.estadoTurno = 'descartando';
-            sala.jogo.primeiraCompra = false; 
-            sala.jogo.permitirRecompra = false; // Comprou lixo, perde direito à recompra
+            sala.jogo.primeiraCompra = false;
+            sala.jogo.permitirRecompra = false;
             
             io.to(sala.id).emit('lixoLimpo'); 
             io.to(sala.id).emit('statusJogo', { msg: `Jogador ${idx+1} pegou o lixo!` });
@@ -192,7 +190,6 @@ const gameActions = {
         if (sala.jogo.obrigacaoTopoLixo) {
             const usouTopoID = cartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo);
             if (!usouTopoID) {
-                // Validação inteligente: Aceita carta equivalente (mesmo naipe/valor)
                 const cartaObrigacaoReal = mao.find(c => c.id === sala.jogo.obrigacaoTopoLixo);
                 const usouEquivalente = cartas.some(c => c.face === cartaObrigacaoReal.face && c.naipe === cartaObrigacaoReal.naipe);
                 if (usouEquivalente) {
@@ -243,27 +240,22 @@ const gameActions = {
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
         
-        // Lógica de Recompra (Primeira Compra Dupla)
+        // Recompra
         if (sala.jogo.permitirRecompra) {
             const ehACartaDaRecompra = (carta.id === sala.jogo.idCartaRecompra);
-            
-            // Sempre desativa para evitar loops
             sala.jogo.permitirRecompra = false;
             sala.jogo.primeiraCompra = false;
 
             if (ehACartaDaRecompra) {
-                // Se descartou a carta comprada -> Joga de novo
                 sala.estadoTurno = 'comprando';
                 io.to(sala.id).emit('statusJogo', { msg: "Descartou a carta certa! Compre novamente." });
                 broadcastEstado(sala);
                 return; // NÃO passa a vez
             } else {
-                // Se descartou outra -> Perdeu a chance, segue normal
-                io.to(sala.id).emit('statusJogo', { msg: "Não descartou a carta comprada. Passou a vez." });
+                io.to(sala.id).emit('statusJogo', { msg: "Descartou outra carta. Passando a vez." });
             }
         }
 
-        // Verifica Batida
         if (mao.length === 0) {
             const idEq = idx % 2;
             const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
@@ -284,7 +276,7 @@ const gameActions = {
             }
         }
 
-        // Sentido Horário: (vez + 1)
+        // Sentido Horário (+1)
         sala.vez = (sala.vez + 1) % 4;
         sala.estadoTurno = 'comprando';
         
@@ -382,10 +374,14 @@ io.on('connection', (socket) => {
     socket.on('resetJogo', () => {
         const s = salas[socket.salaAtual];
         if(s) {
-            console.log("Reset solicitado.");
             s.jogo = null; 
             iniciarNovaRodada(s); 
         }
+    });
+    
+    socket.on('enviarChat', (msg) => {
+        const nome = socket.usuarioLogado ? socket.usuarioLogado.nome : `Jogador ${socket.id.substr(0,4)}`;
+        io.to(socket.salaAtual).emit('receberChat', { nome: nome, msg: msg });
     });
 });
 
