@@ -35,9 +35,18 @@ const getContagemMaos = (sala) => {
 
 const broadcastEstado = (sala) => {
     if(sala && sala.id && sala.jogo) {
-        io.to(sala.id).emit('estadoJogo', sala);
-        io.to(sala.id).emit('atualizarMaosCount', getContagemMaos(sala));
         const placar = calcularPlacarParcial(sala);
+        const contagem = getContagemMaos(sala);
+
+        // CORREÇÃO: Envia tudo dentro do objeto 'estadoJogo' para garantir sincronia
+        io.to(sala.id).emit('estadoJogo', {
+            ...sala,
+            placarCalculado: placar,
+            maosCount: contagem
+        });
+        
+        // Emits individuais para animações pontuais (mantido para compatibilidade)
+        io.to(sala.id).emit('atualizarMaosCount', contagem);
         io.to(sala.id).emit('atualizarPlacar', { p1: placar.p1.total, p2: placar.p2.total });
         io.to(sala.id).emit('atualizarContadores', { monte: sala.jogo.monte.length, lixo: sala.jogo.lixo.length });
     }
@@ -182,24 +191,30 @@ const gameActions = {
         }
     },
 
-    baixarJogo: (sala, idx, dados, socket) => {
+baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return; 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         const cartas = dados.indices.map(i => mao[i]);
 
+        // --- CORREÇÃO OBRIGAÇÃO LIXO ---
         if (sala.jogo.obrigacaoTopoLixo) {
-            const usouTopoID = cartas.some(c => c.id === sala.jogo.obrigacaoTopoLixo);
-            if (!usouTopoID) {
-                const cartaObrigacaoReal = mao.find(c => c.id === sala.jogo.obrigacaoTopoLixo);
-                const usouEquivalente = cartas.some(c => c.face === cartaObrigacaoReal.face && c.naipe === cartaObrigacaoReal.naipe);
-                if (usouEquivalente) {
-                    sala.jogo.obrigacaoTopoLixo = null; 
-                } else {
-                    if(socket) socket.emit('erroJogo', "Use a carta do lixo!"); 
-                    return;
-                }
+            // Verifica se a carta da obrigação está nas cartas baixadas
+            // Usa verificação flexível (mesmo naipe e valor) caso o ID tenha mudado
+            const idObrigacao = sala.jogo.obrigacaoTopoLixo;
+            const cartaObrigacao = sala.jogo[`maoJogador${idx+1}`].find(c => c.id === idObrigacao) || 
+                                   // Fallback: tenta achar pelo ID nos metadados se não achar na mão
+                                   { id: idObrigacao }; 
+
+            const cumpriuObrigacao = cartas.some(c => 
+                c.id === idObrigacao || 
+                (cartaObrigacao.face && c.face === cartaObrigacao.face && c.naipe === cartaObrigacao.naipe)
+            );
+
+            if (cumpriuObrigacao) {
+                sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA O DESCARTE
             } else {
-                sala.jogo.obrigacaoTopoLixo = null; 
+                if(socket) socket.emit('erroJogo', "Você precisa usar a carta que pegou do lixo!"); 
+                return;
             }
         }
 
@@ -387,3 +402,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
