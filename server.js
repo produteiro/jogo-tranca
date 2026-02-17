@@ -334,17 +334,30 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('entrarSala', id => {
-        socket.join(id); 
-        socket.salaAtual = id;
+    socket.on('entrarSala', idSolicitado => {
+        // CORREÇÃO: Se for treino, cria uma sala ÚNICA para este jogador
+        // Se não for treino (futuro multiplayer), usa o ID solicitado
+        const idSala = (idSolicitado === 'treino') ? `treino-${socket.id}` : idSolicitado;
         
-        if (!salas[id]) {
-            salas[id] = { id, jogadores: [null,null,null,null], donos: [null,null,null,null], usuarios: [null,null,null,null], jogo: null, vez: 0 };
+        socket.join(idSala); 
+        socket.salaAtual = idSala;
+        
+        // Cria a sala se não existir
+        if (!salas[idSala]) {
+            salas[idSala] = { 
+                id: idSala, 
+                jogadores: [null,null,null,null], 
+                donos: [null,null,null,null], 
+                usuarios: [null,null,null,null], 
+                jogo: null, 
+                vez: 0 
+            };
         }
         
-        const s = salas[id];
+        const s = salas[idSala];
         let slot = s.donos.indexOf(null);
         
+        // Reconexão: Se já sou dono, volto pro meu lugar
         if (s.donos.includes(socket.id)) slot = s.donos.indexOf(socket.id);
         
         if(slot !== -1) { 
@@ -353,14 +366,21 @@ io.on('connection', (socket) => {
             s.usuarios[slot] = socket.usuarioLogado;
         }
         
-        if(id === 'treino') { 
-            for(let i=0; i<4; i++) if(!s.donos[i]) { s.donos[i] = `BOT-${i}`; s.jogadores[i] = `BOT-${i}`; }
+        // Se for treino (qualquer sala que comece com 'treino-'), preenche com Bots
+        if(idSala.startsWith('treino-')) { 
+            for(let i=0; i<4; i++) {
+                if(!s.donos[i]) { 
+                    s.donos[i] = `BOT-${i}`; 
+                    s.jogadores[i] = `BOT-${i}`; 
+                }
+            }
         }
         
+        // Inicia o jogo se estiver cheio
         if(s.donos.every(d => d !== null) && !s.jogo) {
             iniciarNovaRodada(s);
         } else if (s.jogo) {
-            socket.emit('estadoJogo', s);
+            socket.emit('estadoJogo', s); // Envia estado atual se reconectar
         }
     });
 
@@ -394,4 +414,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
