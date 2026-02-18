@@ -142,6 +142,7 @@ function prepararPartida() {
             });
         });
     });
+}
 
 function verificarSeEncaixa(jogo, carta) {
     return validarJogo([...jogo, carta]);
@@ -455,4 +456,5 @@ function encontrarSequencias(mao) {
     encontrarTrincas, encontrarSequencias,
     gerarIdCarta  // ✅ Exporta a função
 };
+
 
