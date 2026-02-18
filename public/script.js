@@ -75,7 +75,7 @@ function atualizarMesa(sala) {
     turnoAtivo = (sala.vez === meuIndex);
     const estado = sala.estadoTurno;
 
-    // 1. Header
+    // Header
     const info = document.getElementById('info-jogo');
     if(info) {
         const nomeVez = turnoAtivo ? "SUA VEZ" : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
@@ -83,17 +83,15 @@ function atualizarMesa(sala) {
         info.style.color = turnoAtivo ? '#f1c40f' : '#fff';
     }
 
-    // 2. Placar com Indicador de Morto (MELHORIA 2)
+    // 1. Placar com Ícone de Morto (Novo)
     atualizarPlacarComIndicadores(sala);
 
-    // 3. Mesa e Lixo
+    // 2. Mesa, Lixo e Mortos Visuais (Novo)
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
-    
-    // 4. Visual dos Mortos (MELHORIA 1)
-    atualizarVisualMortos(sala);
+    atualizarVisualMortos(sala); // <-- Chama a função corrigida
 
-    // 5. Adversários
+    // Adversários
     const contagemMaos = sala.maosCount || [0,0,0,0];
     const idxDireita  = (meuIndex + 1) % 4;
     const idxTopo     = (meuIndex + 2) % 4;
@@ -103,7 +101,7 @@ function atualizarMesa(sala) {
     desenharMaoAdversario('mao-topo', contagemMaos[idxTopo]);
     desenharMaoAdversario('mao-esquerda', contagemMaos[idxEsquerda]);
 
-    // 6. Minha Mão e Jogos
+    // Mão e Jogos
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
     const idEq = meuIndex % 2;
@@ -447,81 +445,57 @@ function jogarNovamente() {
 }
 window.jogarNovamente = jogarNovamente;
 
-// --- MELHORIA 1: Remove o morto visualmente se ele acabou ---
+// --- MELHORIA 1: VISUAL DO MORTO (Corrigido ID 'area-mortos') ---
 function atualizarVisualMortos(sala) {
-    // Procura o container dos mortos (pode ser pelo ID 'mortos' ou classe)
-    // Se o seu HTML tiver IDs específicos para cada morto, ajuste aqui.
-    // Assumindo um container geral 'mortos' que contém as imagens.
-    
-    const divMortos = document.getElementById('mortos');
+    // Busca pelo ID correto que está no seu HTML
+    const divMortos = document.getElementById('area-mortos');
     if (!divMortos) return;
 
-    // Limpa o conteúdo atual para redesenhar baseado no estado real
+    // Limpa o conteúdo estático (as divs antigas morto1/morto2 somem aqui)
     divMortos.innerHTML = ''; 
-    
-    // Título ou label (opcional, para manter o layout)
-    const label = document.createElement('div');
-    label.style.cssText = 'position:absolute; top:-20px; width:100%; text-align:center; font-size:12px; color:rgba(255,255,255,0.3);';
-    label.innerText = 'MORTOS';
-    divMortos.appendChild(label);
 
-    // Verifica Morto 1
+    // Se Morto 1 ainda existe no servidor
     if (sala.jogo.morto1 && sala.jogo.morto1.length > 0) {
         const imgM1 = document.createElement('img');
         imgM1.src = 'https://deckofcardsapi.com/static/img/back.png';
         imgM1.className = 'carta-morto';
-        // Estilo inline para empilhar ou posicionar (ajuste conforme seu CSS)
-        imgM1.style.cssText = 'width: 60px; position: absolute; left: 10px; top: 10px; transform: rotate(-5deg); box-shadow: 2px 2px 5px black;';
+        // Posicionamento visual
+        imgM1.style.cssText = 'width: 70px; position: absolute; left: 10px; top: 10px; border-radius: 5px; box-shadow: 2px 2px 5px black;';
         divMortos.appendChild(imgM1);
     }
 
-    // Verifica Morto 2
+    // Se Morto 2 ainda existe no servidor
     if (sala.jogo.morto2 && sala.jogo.morto2.length > 0) {
         const imgM2 = document.createElement('img');
         imgM2.src = 'https://deckofcardsapi.com/static/img/back.png';
         imgM2.className = 'carta-morto';
-        // Desloca um pouco para parecer que tem outro monte
-        imgM2.style.cssText = 'width: 60px; position: absolute; left: 20px; top: 5px; transform: rotate(10deg); box-shadow: 2px 2px 5px black;';
+        // Cruzado/Rotacionado visualmente
+        imgM2.style.cssText = 'width: 70px; position: absolute; left: 25px; top: 5px; transform: rotate(90deg); border-radius: 5px; box-shadow: 2px 2px 5px black;';
         divMortos.appendChild(imgM2);
     }
-    
-    // Se ambos acabaram, a div ficará vazia (apenas com o label ou invisível)
 }
 
-// --- MELHORIA 2: Placar com ícone de quem pegou o morto ---
+// --- MELHORIA 2: PLACAR COM INDICADOR DE QUEM PEGOU O MORTO ---
 function atualizarPlacarComIndicadores(sala) {
     if (!sala.placarCalculado) return;
 
-    const idMinhaEquipe = meuIndex % 2; // 0 ou 1
-    const idEquipeAdv = (idMinhaEquipe + 1) % 2; // O inverso
+    const idMinhaEquipe = meuIndex % 2; 
+    const idEquipeAdv = (idMinhaEquipe + 1) % 2;
 
-    // Pega os pontos
     const ptsNos = (idMinhaEquipe === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
     const ptsEles = (idMinhaEquipe === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
 
-    // Verifica quem pegou o morto (array boolean no servidor)
+    // Verifica status do morto
     const nosPegamosMorto = sala.jogo.equipePegouMorto[idMinhaEquipe];
     const elesPegaramMorto = sala.jogo.equipePegouMorto[idEquipeAdv];
 
-    // Ícone ou Texto para indicar
-    const iconeMorto = ' <span style="color:#2ecc71; font-size:1.2em;" title="Já pegou o morto">✅</span>';
+    // Ícone de "Check" verde se pegou
+    const icone = ' <span style="color:#2ecc71; font-size:16px; margin-left:5px;" title="Pegou o morto">✅</span>';
 
-    // Atualiza o DOM
+    // Atualiza HTML
     const elNos = document.getElementById('pts-nos');
     const elEles = document.getElementById('pts-eles');
     
-    // Labels (NÓS / ELES) para adicionar o ícone ao lado do nome se quiser, 
-    // ou apenas manter no visual. Aqui vou injetar no container do placar se possível.
-    
-    // Se você tiver elementos de label separados (ex: id="label-nos"), use-os. 
-    // Caso contrário, vamos tentar injetar visualmente perto dos pontos.
-    
-    // Atualiza Pontos Numericos
-    if(elNos) {
-        elNos.innerHTML = ptsNos + (nosPegamosMorto ? iconeMorto : '');
-    }
-    if(elEles) {
-        elEles.innerHTML = ptsEles + (elesPegaramMorto ? iconeMorto : '');
-    }
+    if(elNos) elNos.innerHTML = ptsNos + (nosPegamosMorto ? icone : '');
+    if(elEles) elEles.innerHTML = ptsEles + (elesPegaramMorto ? icone : '');
 }
-
