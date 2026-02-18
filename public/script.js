@@ -499,3 +499,34 @@ function atualizarPlacarComIndicadores(sala) {
     if(elNos) elNos.innerHTML = ptsNos + (nosPegamosMorto ? icone : '');
     if(elEles) elEles.innerHTML = ptsEles + (elesPegaramMorto ? icone : '');
 }
+
+// --- MELHORIA: VISUAL DO MORTO EM CRUZ CENTRALIZADA ---
+function atualizarVisualMortos(sala) {
+    const divMortos = document.getElementById('area-mortos');
+    if (!divMortos) return;
+
+    divMortos.innerHTML = ''; 
+
+    // Estilo base comum para centralizar absolutamente
+    const estiloBase = 'width: 75px; position: absolute; left: 50%; top: 50%; border-radius: 6px; box-shadow: 2px 2px 8px rgba(0,0,0,0.6); transition: all 0.3s ease;';
+
+    // Morto 1: Vertical (Fundo)
+    if (sala.jogo.morto1 && sala.jogo.morto1.length > 0) {
+        const imgM1 = document.createElement('img');
+        imgM1.src = 'https://deckofcardsapi.com/static/img/back.png';
+        imgM1.className = 'carta-morto';
+        // Centraliza exato no meio
+        imgM1.style.cssText = `${estiloBase} transform: translate(-50%, -50%); z-index: 1;`;
+        divMortos.appendChild(imgM1);
+    }
+
+    // Morto 2: Horizontal (Topo, Cruzado)
+    if (sala.jogo.morto2 && sala.jogo.morto2.length > 0) {
+        const imgM2 = document.createElement('img');
+        imgM2.src = 'https://deckofcardsapi.com/static/img/back.png';
+        imgM2.className = 'carta-morto';
+        // Centraliza e rotaciona 90 graus
+        imgM2.style.cssText = `${estiloBase} transform: translate(-50%, -50%) rotate(90deg); z-index: 2;`;
+        divMortos.appendChild(imgM2);
+    }
+}
