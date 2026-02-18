@@ -210,54 +210,52 @@ baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return; 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         
-        // ✅ Aceita tanto IDs quanto índices (retrocompatibilidade)
-        let cartas;
+        // --- 1. Recuperar as Cartas ---
+        let cartas = [];
         if (dados.ids) {
-            // Novo formato: usa IDs
-            cartas = dados.ids.map(id => mao.find(c => c.id === id));
-            
-            // Valida se todas as cartas foram encontradas
-            if (cartas.some(c => !c)) {
-                console.error('❌ Carta não encontrada:', dados.ids);
-                if(socket) socket.emit('erroJogo', 'Cartas não encontradas na mão!');
-                return;
-            }
+            cartas = dados.ids.map(id => mao.find(c => c.id === id)).filter(Boolean);
         } else if (dados.indices) {
-            // Formato antigo: usa índices (retrocompatibilidade)
-            cartas = dados.indices.map(i => mao[i]);
-        } else {
-            console.error('❌ Dados inválidos:', dados);
+            cartas = dados.indices.map(i => mao[i]).filter(Boolean);
+        }
+
+        if (cartas.length === 0) {
+            if(socket) socket.emit('erroJogo', 'Cartas inválidas.');
             return;
         }
-        
+
         console.log('🎴 Baixando jogo com cartas:', cartas.map(c => c.id));
 
-        if (validarJogo(jogoFinal)) {
-            // ✅ Remove cartas por ID
-            cartas.forEach(carta => {
-                const idx = mao.findIndex(c => c.id === carta.id);
-                if (idx !== -1) mao.splice(idx, 1);
-            });
-            const cumpriu = cartas.some(c => 
-                c.id === ob.id || 
-                (c.face === ob.face && c.naipe === ob.naipe)
-            );
-
-            if (cumpriu) {
-                console.log('✅ Obrigação cumprida! Limpando...');
-                sala.jogo.obrigacaoTopoLixo = null; 
-            } else {
-                console.log('⚠️ Carta obrigatória não foi usada neste jogo');
-            }
-        }
-
+        // --- 2. Preparar Jogo Final ---
         const idEquipe = idx % 2;
         let jogoAlvo = (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) 
                        ? sala.jogo.jogosNaMesa[idEquipe][dados.indexJogoMesa] : [];
         let jogoFinal = [...jogoAlvo, ...cartas];
 
+        // --- 3. Validar ---
         if (validarJogo(jogoFinal)) {
-            dados.indices.sort((a, b) => b - a).forEach(i => mao.splice(i, 1));
+            // Verifica Obrigação do Lixo (Flexível)
+            if (sala.jogo.obrigacaoTopoLixo) {
+                let ob = sala.jogo.obrigacaoTopoLixo;
+                
+                // Compatibilidade: Se ob for apenas string (ID), transforma em objeto fake para comparar ID
+                if (typeof ob === 'string') ob = { id: ob }; 
+
+                const cumpriu = cartas.some(c => 
+                    c.id === ob.id || 
+                    (c.face === ob.face && c.naipe === ob.naipe)
+                );
+
+                if (cumpriu) {
+                    sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA OBRIGAÇÃO
+                }
+            }
+
+            // Remove cartas da mão
+            cartas.forEach(c => {
+                const index = mao.findIndex(m => m.id === c.id);
+                if(index !== -1) mao.splice(index, 1);
+            });
+            
             jogoFinal = ordenarJogoMesa(jogoFinal);
             
             if (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) {
@@ -504,6 +502,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
