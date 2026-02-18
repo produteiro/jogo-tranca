@@ -202,15 +202,25 @@ body::after {
 }
 
 /* --- MESA PRINCIPAL --- */
-#mesa { 
-    width: 100%; 
-    height: 100%; 
-    max-width: 1600px; 
-    display: flex; 
-    flex-direction: column; 
-    justify-content: center; 
-    position: relative; 
-    padding: 80px 25px 180px 25px;
+#mesa {
+    display: none; /* Começa oculto (tela de login). O JS muda para 'flex' ao entrar. */
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto; /* Habilita rolagem vertical na mesa se o conteúdo (mão) crescer */
+    overflow-x: hidden;
+    justify-content: flex-start; /* Garante que começa do topo */
+    padding-bottom: 0; /* Reset de padding antigo */
+}
+
+#area-mortos {
+    position: relative; /* Essencial para o posicionamento absoluto das cartas dentro */
+    width: 120px;       /* Largura fixa para manter o espaço na mesa */
+    height: 120px;      /* Altura fixa */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;     /* Garante centralização se estiver solto */
 }
 
 /* 🆕 NOMES DOS JOGADORES NAS LATERAIS - ESTILO TRANCAON */
@@ -511,6 +521,16 @@ body::after {
     background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, transparent);
     z-index: 100;
     pointer-events: none;
+}
+
+#hud-jogador, .area-inferior {
+    position: relative; 
+    width: 100%;
+    margin-top: auto; /* Empurra para o final da área disponível */
+    background: linear-gradient(to top, rgba(15, 23, 42, 1) 20%, transparent);
+    padding: 20px 10px;
+    z-index: 50;
+    flex-shrink: 0;
 }
 
 #hud-jogador > * { pointer-events: auto; }
@@ -1022,27 +1042,18 @@ body::after {
     touch-action: manipulation; /* Melhora resposta ao toque */
 }
 
+/* --- CONFIGURAÇÃO GERAL DA PÁGINA --- */
 html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
-    overflow: hidden; /* Evita scroll duplo */
+    overflow: hidden; /* Evita rolagem dupla na janela principal */
     background-color: #0f172a;
     font-family: 'Segoe UI', sans-serif;
 }
 
-/* --- CONTAINER PRINCIPAL (MESA) --- */
-#mesa {
-    display: none; /* Controlado pelo JS */
-    flex-direction: column;
-    width: 100%;
-    height: 100%; /* Ocupa a tela toda */
-    overflow-y: auto; /* IMPORTANTE: Permite rolar se o conteúdo for maior que a tela */
-    overflow-x: hidden;
-    padding-bottom: 80px; /* Espaço para a mão não cobrir o final */
-}
-
+*/
 /* --- ÁREAS DO JOGO --- */
 /* Distribuição vertical flexível */
 #info-jogo, #placar {
@@ -1142,12 +1153,12 @@ html, body {
 
 #minha-mao {
     display: flex;
+    flex-wrap: wrap; /* Permite quebrar linha se tiver muitas cartas */
     justify-content: center;
-    flex-wrap: wrap; /* CRUCIAL: Quebra linha se não couber */
-    gap: 8px; /* Espaço lado a lado, sem sobreposição */
+    gap: 5px;
     width: 100%;
     max-width: 1200px;
-    padding-bottom: 20px;
+    margin: 0 auto;
 }
 
 /* Ajuste de sobreposição para caber na tela sem scroll */
@@ -1229,6 +1240,7 @@ button {
         height: 77px;
     }
 }
+
 
 
 
