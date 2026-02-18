@@ -83,21 +83,17 @@ function atualizarMesa(sala) {
         info.style.color = turnoAtivo ? '#f1c40f' : '#fff';
     }
 
-    // 2. Placar
-    if (sala.placarCalculado) {
-        const idEq = meuIndex % 2;
-        const ptsNos = (idEq === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
-        const ptsEles = (idEq === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
-        const elNos = document.getElementById('pts-nos');
-        const elEles = document.getElementById('pts-eles');
-        if(elNos) elNos.innerText = ptsNos;
-        if(elEles) elEles.innerText = ptsEles;
-    }
+    // 2. Placar com Indicador de Morto (MELHORIA 2)
+    atualizarPlacarComIndicadores(sala);
 
+    // 3. Mesa e Lixo
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
+    
+    // 4. Visual dos Mortos (MELHORIA 1)
+    atualizarVisualMortos(sala);
 
-    // 3. Adversários
+    // 5. Adversários
     const contagemMaos = sala.maosCount || [0,0,0,0];
     const idxDireita  = (meuIndex + 1) % 4;
     const idxTopo     = (meuIndex + 2) % 4;
@@ -107,6 +103,7 @@ function atualizarMesa(sala) {
     desenharMaoAdversario('mao-topo', contagemMaos[idxTopo]);
     desenharMaoAdversario('mao-esquerda', contagemMaos[idxEsquerda]);
 
+    // 6. Minha Mão e Jogos
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
     const idEq = meuIndex % 2;
@@ -449,3 +446,82 @@ function jogarNovamente() {
     socket.emit('resetJogo');
 }
 window.jogarNovamente = jogarNovamente;
+
+// --- MELHORIA 1: Remove o morto visualmente se ele acabou ---
+function atualizarVisualMortos(sala) {
+    // Procura o container dos mortos (pode ser pelo ID 'mortos' ou classe)
+    // Se o seu HTML tiver IDs específicos para cada morto, ajuste aqui.
+    // Assumindo um container geral 'mortos' que contém as imagens.
+    
+    const divMortos = document.getElementById('mortos');
+    if (!divMortos) return;
+
+    // Limpa o conteúdo atual para redesenhar baseado no estado real
+    divMortos.innerHTML = ''; 
+    
+    // Título ou label (opcional, para manter o layout)
+    const label = document.createElement('div');
+    label.style.cssText = 'position:absolute; top:-20px; width:100%; text-align:center; font-size:12px; color:rgba(255,255,255,0.3);';
+    label.innerText = 'MORTOS';
+    divMortos.appendChild(label);
+
+    // Verifica Morto 1
+    if (sala.jogo.morto1 && sala.jogo.morto1.length > 0) {
+        const imgM1 = document.createElement('img');
+        imgM1.src = 'https://deckofcardsapi.com/static/img/back.png';
+        imgM1.className = 'carta-morto';
+        // Estilo inline para empilhar ou posicionar (ajuste conforme seu CSS)
+        imgM1.style.cssText = 'width: 60px; position: absolute; left: 10px; top: 10px; transform: rotate(-5deg); box-shadow: 2px 2px 5px black;';
+        divMortos.appendChild(imgM1);
+    }
+
+    // Verifica Morto 2
+    if (sala.jogo.morto2 && sala.jogo.morto2.length > 0) {
+        const imgM2 = document.createElement('img');
+        imgM2.src = 'https://deckofcardsapi.com/static/img/back.png';
+        imgM2.className = 'carta-morto';
+        // Desloca um pouco para parecer que tem outro monte
+        imgM2.style.cssText = 'width: 60px; position: absolute; left: 20px; top: 5px; transform: rotate(10deg); box-shadow: 2px 2px 5px black;';
+        divMortos.appendChild(imgM2);
+    }
+    
+    // Se ambos acabaram, a div ficará vazia (apenas com o label ou invisível)
+}
+
+// --- MELHORIA 2: Placar com ícone de quem pegou o morto ---
+function atualizarPlacarComIndicadores(sala) {
+    if (!sala.placarCalculado) return;
+
+    const idMinhaEquipe = meuIndex % 2; // 0 ou 1
+    const idEquipeAdv = (idMinhaEquipe + 1) % 2; // O inverso
+
+    // Pega os pontos
+    const ptsNos = (idMinhaEquipe === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
+    const ptsEles = (idMinhaEquipe === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
+
+    // Verifica quem pegou o morto (array boolean no servidor)
+    const nosPegamosMorto = sala.jogo.equipePegouMorto[idMinhaEquipe];
+    const elesPegaramMorto = sala.jogo.equipePegouMorto[idEquipeAdv];
+
+    // Ícone ou Texto para indicar
+    const iconeMorto = ' <span style="color:#2ecc71; font-size:1.2em;" title="Já pegou o morto">✅</span>';
+
+    // Atualiza o DOM
+    const elNos = document.getElementById('pts-nos');
+    const elEles = document.getElementById('pts-eles');
+    
+    // Labels (NÓS / ELES) para adicionar o ícone ao lado do nome se quiser, 
+    // ou apenas manter no visual. Aqui vou injetar no container do placar se possível.
+    
+    // Se você tiver elementos de label separados (ex: id="label-nos"), use-os. 
+    // Caso contrário, vamos tentar injetar visualmente perto dos pontos.
+    
+    // Atualiza Pontos Numericos
+    if(elNos) {
+        elNos.innerHTML = ptsNos + (nosPegamosMorto ? iconeMorto : '');
+    }
+    if(elEles) {
+        elEles.innerHTML = ptsEles + (elesPegaramMorto ? iconeMorto : '');
+    }
+}
+
