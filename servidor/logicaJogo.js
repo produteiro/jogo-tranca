@@ -120,8 +120,6 @@ function ordenarJogoMesa(cartas) {
     return resultado;
 }
 
-// ... (Mantenha o código anterior até a função prepararPartida)
-
 function prepararPartida() {
     const naipes = ['copas', 'ouros', 'paus', 'espadas'];
     const faces = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']; 
@@ -184,7 +182,7 @@ function prepararPartida() {
     jogo.lixo.push(baralho.pop());
     jogo.monte = baralho;
 
-    // 5. IMPORTANTE: Retorna o objeto jogo!
+    // 5. CRUCIAL: Retorna o objeto
     return jogo;
 }
 
@@ -502,6 +500,7 @@ function encontrarSequencias(mao) {
     encontrarTrincas, encontrarSequencias,
     gerarIdCarta  // ✅ Exporta a função
 };
+
 
 
 
