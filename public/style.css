@@ -62,22 +62,12 @@ body::after {
 
 /* --- HEADER --- */
 #game-header {
-    position: fixed; 
-    top: 0; 
-    left: 0; 
-    width: 100%; 
-    height: 70px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.85) 100%);
-    border-bottom: 2px solid rgba(255,255,255,0.1);
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center;
-    padding: 0 25px;
-    padding-bottom: 10px;
-    z-index: 2000;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
-    margin-top: 20px; /* Dá respiro do topo */
-    flex-shrink: 0; /* Garante que o header não encolha */
+    position: relative;
+    z-index: 60; /* Fica acima das cartas se der conflito */
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #0f172a; /* Garante fundo para leitura */
 }
 
 .header-left .logo { 
@@ -203,14 +193,13 @@ body::after {
 
 /* --- MESA PRINCIPAL --- */
 #mesa {
-    display: none; /* Começa oculto (tela de login). O JS muda para 'flex' ao entrar. */
+    display: none; /* Controlado pelo JS */
     flex-direction: column;
     width: 100%;
     height: 100%;
-    overflow-y: auto; /* Habilita rolagem vertical na mesa se o conteúdo (mão) crescer */
+    overflow-y: auto; /* ✅ Habilita a rolagem vertical aqui */
     overflow-x: hidden;
-    justify-content: flex-start; /* Garante que começa do topo */
-    padding-bottom: 0; /* Reset de padding antigo */
+    position: relative;
 }
 
 #area-mortos {
@@ -233,30 +222,23 @@ body::after {
     pointer-events: none; 
 }
 
-#mao-esquerda { 
-    left: 20px;
-    top: 50%;
+#mao-esquerda, #mao-direita {
+    top: 55%; /* Desloca um pouco para baixo do meio matemático */
     transform: translateY(-50%);
-    flex-direction: column;
-    width: 80px;
-} 
-
-#mao-direita { 
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    flex-direction: column;
-    width: 80px;
 }
 
 #mao-topo { 
-    top: 85px;
+    top: 130px;
     left: 50%;
     transform: translateX(-50%);
     flex-direction: row;
     z-index: 40;
 }
-
+/* 3. Empurra os jogos dos adversários para baixo da mão do parceiro */
+#jogos-adversarios {
+    /* Precisa estar abaixo do mao-topo */
+    top: 190px; 
+}
 .info-player { 
     position: absolute;
     background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
@@ -346,7 +328,8 @@ body::after {
     width: 100%;
     max-width: 750px;
     height: 150px;
-    margin: 12px auto;
+    margin-top: 50px; /* Espaço extra para não colar nos jogos adversários */
+    margin-bottom: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -509,18 +492,13 @@ body::after {
 }
 
 /* --- HUD JOGADOR --- */
-#hud-jogador { 
-    position: fixed;
-    bottom: 0;
-    left: 0;
+#hud-jogador {
+    position: relative; 
     width: 100%;
-    height: 170px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, transparent);
-    z-index: 100;
-    pointer-events: none;
+    margin-top: auto; /* Empurra para o fim, mas permite crescer */
+    padding-bottom: 20px;
+    background: linear-gradient(to top, rgba(15, 23, 42, 1) 40%, transparent);
+    z-index: 50;
 }
 
 #hud-jogador, .area-inferior {
@@ -1240,6 +1218,7 @@ button {
         height: 77px;
     }
 }
+
 
 
 
