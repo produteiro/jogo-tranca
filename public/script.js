@@ -196,10 +196,22 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
             grupo.onclick = (e) => {
                 e.stopPropagation();
                 if (cartasSelecionadas.length > 0) {
-                    console.log('🎯 Adicionando cartas ao jogo:', idxJogo);
+                    // ✅ NOVO: Converte índices em IDs
+                    const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
+                    if (!mao) {
+                        console.error('❌ Mão não encontrada');
+                        return;
+                    }
+                    
+                    const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
+                    console.log('🎯 Adicionando cartas ao jogo', idxJogo, '- IDs:', ids);
+                    
                     socket.emit('jogada', { 
                         acao: 'baixarJogo', 
-                        dados: { indices: cartasSelecionadas, indexJogoMesa: idxJogo } 
+                        dados: { 
+                            ids: ids,  // ✅ Mudou de 'indices' para 'ids'
+                            indexJogoMesa: idxJogo 
+                        } 
                     });
                     cartasSelecionadas = [];
                     atualizarVisualSelecao();
@@ -284,12 +296,21 @@ window.acaoDescartar = function() {
     }
     
     const indexCarta = cartasSelecionadas[0];
-    console.log(`🗑️ Enviando descarte: Index ${indexCarta}`);
     
-    // Envia o comando. O servidor vai decidir se aceita (se não tiver obrigação pendente)
+    // ✅ NOVO: Pega o ID da carta ao invés do índice
+    const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
+    if (!mao || !mao[indexCarta]) {
+        console.error('❌ Carta não encontrada na mão');
+        return;
+    }
+    
+    const cartaId = mao[indexCarta].id;
+    console.log(`🗑️ Enviando descarte: Index ${indexCarta} → ID ${cartaId}`);
+    
+    // ✅ Envia o ID da carta
     socket.emit('jogada', { 
         acao: 'descartar', 
-        dados: { index: indexCarta } 
+        dados: { id: cartaId }  // ✅ Mudou de 'index' para 'id'
     });
     
     // Limpeza visual imediata para feedback
@@ -303,7 +324,30 @@ window.acaoDescartar = function() {
 
 window.acaoBaixar = function() {
     if(cartasSelecionadas.length < 3) return alert("Selecione 3+ cartas");
-    socket.emit('jogada', { acao: 'baixarJogo', dados: { indices: cartasSelecionadas, indexJogoMesa: null } });
+    
+    // ✅ NOVO: Converte índices em IDs
+    const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
+    if (!mao) {
+        console.error('❌ Mão não encontrada');
+        return;
+    }
+    
+    const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
+    if (ids.length !== cartasSelecionadas.length) {
+        console.error('❌ Algumas cartas não foram encontradas');
+        return;
+    }
+    
+    console.log('📥 Baixando jogo com IDs:', ids);
+    
+    socket.emit('jogada', { 
+        acao: 'baixarJogo', 
+        dados: { 
+            ids: ids,  // ✅ Mudou de 'indices' para 'ids'
+            indexJogoMesa: null 
+        } 
+    });
+    
     cartasSelecionadas = [];
 };
 
@@ -413,3 +457,4 @@ function jogarNovamente() {
 
 // No final do arquivo:
 window.jogarNovamente = jogarNovamente;
+
