@@ -129,6 +129,7 @@ const iniciarNovaRodada = (sala) => {
 };
 
 // --- AÇÕES DO JOGO ---
+// --- AÇÕES DO JOGO ---
 const gameActions = {
     comprarDoMonte: (sala, idx, socket) => {
         if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
@@ -139,32 +140,26 @@ const gameActions = {
     
         const ehPrimeiraCompra = sala.jogo.primeiraCompra && sala.jogo.primeiraCompraJogador === idx;
         
-        // 1. CAPTURA O ESTADO DA MÃO ANTES (Para detectar trocas de 3 Vermelho)
+        // Snapshot para detectar troca de carta (3 vermelho)
         const idsAntes = new Set(sala.jogo[`maoJogador${idx + 1}`].map(c => c.id));
-
         const cartaOriginal = sala.jogo.monte.pop();
         
         if (sala.jogo.monte.length === 0) garantirMonteDisponivel(sala);
         
         sala.jogo[`maoJogador${idx + 1}`].push(cartaOriginal);
-        
-        // Essa função pode trocar a carta se for 3 Vermelho e reordenar a mão!
         higienizarMaoComTresVermelhos(sala, idx);
-        
         sala.estadoTurno = 'descartando';
         
-        // 2. IDENTIFICA A CARTA REAL QUE FICOU NA MÃO
+        // Identifica qual carta ficou na mão (pode ser a original ou uma reposição)
         const maoAtual = sala.jogo[`maoJogador${idx + 1}`];
         const cartaRealNaMao = maoAtual.find(c => !idsAntes.has(c.id)) || cartaOriginal;
 
         if (ehPrimeiraCompra) {
             sala.jogo.permitirRecompra = true;
-            // Salva o ID da carta que REALMENTE entrou na mão (não a original se foi trocada)
             sala.jogo.idCartaRecompra = cartaRealNaMao.id;
             io.to(sala.id).emit('statusJogo', { msg: "Primeira compra! Descarte esta mesma carta para comprar de novo." });
         }
 
-        // Avisa o cliente para destacar a carta correta
         io.to(sala.jogadores[idx]).emit('cartaComprada', { cartaId: cartaRealNaMao.id }); 
         broadcastEstado(sala);
     },
@@ -186,11 +181,14 @@ const gameActions = {
             const todoLixo = sala.jogo.lixo.splice(0);
             sala.jogo[`maoJogador${idx + 1}`] = mao.concat(todoLixo);
             
-        // ✅ Salva só o ID (já é descritivo)
-            sala.jogo.obrigacaoTopoLixo = cartaTopo.id;
-            console.log('🔒 Obrigação definida:', cartaTopo.id);
-
-            console.log('🔒 Obrigação definida:', sala.jogo.obrigacaoTopoLixo);
+            // ✅ IMPORTANTE: Salva o objeto completo para validação flexível (face/naipe)
+            sala.jogo.obrigacaoTopoLixo = {
+                id: cartaTopo.id,
+                face: cartaTopo.face,
+                naipe: cartaTopo.naipe
+            };
+            
+            console.log('🔒 Obrigação definida (LIXO):', sala.jogo.obrigacaoTopoLixo);
             
             higienizarMaoComTresVermelhos(sala, idx);
             sala.estadoTurno = 'descartando';
@@ -206,11 +204,11 @@ const gameActions = {
         }
     },
 
-baixarJogo: (sala, idx, dados, socket) => {
+    baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return; 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         
-        // --- 1. Recuperar as Cartas ---
+        // Recuperar as Cartas (IDs ou Índices)
         let cartas = [];
         if (dados.ids) {
             cartas = dados.ids.map(id => mao.find(c => c.id === id)).filter(Boolean);
@@ -223,30 +221,29 @@ baixarJogo: (sala, idx, dados, socket) => {
             return;
         }
 
-        console.log('🎴 Baixando jogo com cartas:', cartas.map(c => c.id));
-
-        // --- 2. Preparar Jogo Final ---
         const idEquipe = idx % 2;
+        // 1. Define o jogo alvo ANTES de validar
         let jogoAlvo = (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) 
                        ? sala.jogo.jogosNaMesa[idEquipe][dados.indexJogoMesa] : [];
+        
+        // 2. Cria o jogo final para validação
         let jogoFinal = [...jogoAlvo, ...cartas];
 
-        // --- 3. Validar ---
+        // 3. Valida
         if (validarJogo(jogoFinal)) {
-            // Verifica Obrigação do Lixo (Flexível)
+            
+            // Verifica se cumpriu a obrigação do lixo
             if (sala.jogo.obrigacaoTopoLixo) {
-                let ob = sala.jogo.obrigacaoTopoLixo;
-                
-                // Compatibilidade: Se ob for apenas string (ID), transforma em objeto fake para comparar ID
-                if (typeof ob === 'string') ob = { id: ob }; 
-
+                const ob = sala.jogo.obrigacaoTopoLixo;
+                // Aceita se for o mesmo ID OU a mesma carta (face/naipe)
                 const cumpriu = cartas.some(c => 
                     c.id === ob.id || 
                     (c.face === ob.face && c.naipe === ob.naipe)
                 );
 
                 if (cumpriu) {
-                    sala.jogo.obrigacaoTopoLixo = null; // ✅ DESTRAVA OBRIGAÇÃO
+                    console.log("✅ Obrigação do Lixo CUMPRIADA ao baixar jogo.");
+                    sala.jogo.obrigacaoTopoLixo = null; 
                 }
             }
 
@@ -264,6 +261,7 @@ baixarJogo: (sala, idx, dados, socket) => {
                 sala.jogo.jogosNaMesa[idEquipe].push(jogoFinal);
             }
             
+            // Verifica Morto ou Canastra
             if (mao.length === 0) {
                 const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
                 if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDisponivel) entregarMorto(sala, idx);
@@ -280,52 +278,49 @@ baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return;
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         
-        // ✅ Aceita ID ou índice
         let indexCarta;
         if (typeof cartaIdOuIndex === 'string') {
-            // É um ID
             indexCarta = mao.findIndex(c => c.id === cartaIdOuIndex);
-            if (indexCarta === -1) {
-                console.error('❌ Carta não encontrada:', cartaIdOuIndex);
-                if(socket) socket.emit('erroJogo', 'Carta não encontrada!');
-                return;
-            }
-            console.log('🗑️ Descartando carta ID:', cartaIdOuIndex);
         } else {
-            // É um índice (retrocompatibilidade)
             indexCarta = cartaIdOuIndex;
-            if (!mao[indexCarta]) return;
-            console.log('🗑️ Descartando índice:', indexCarta, '→', mao[indexCarta]?.id);
         }
 
-// --- TRAVA DE SEGURANÇA INTELIGENTE ---
-if (sala.jogo.obrigacaoTopoLixo) {
+        if (indexCarta === -1 || !mao[indexCarta]) {
+            if(socket) socket.emit('erroJogo', 'Carta não encontrada!');
+            return;
+        }
+
+        // --- TRAVA DE SEGURANÇA INTELIGENTE ---
+        if (sala.jogo.obrigacaoTopoLixo) {
             const ob = sala.jogo.obrigacaoTopoLixo;
-            console.log('🔒 Verificando obrigação:', ob.id);
             
-            // ✅ Busca por ID descritivo
-            const cartaAindaNaMao = mao.find(c => c.id === ob.id);
+            // Verifica se a carta AINDA está na mão. 
+            // Se NÃO estiver, é porque já foi baixada (e o código de baixar falhou em limpar a flag, ou delay).
+            // Nesse caso, PERMITE o descarte para não travar o jogo.
+            const cartaAindaNaMao = mao.find(c => 
+                c.id === ob.id || 
+                (c.face === ob.face && c.naipe === ob.naipe)
+            );
 
             if (cartaAindaNaMao) {
-                // Carta ainda na mão - BLOQUEIA
-                console.log('❌ Carta obrigatória ainda na mão!');
-                if(socket) socket.emit('erroJogo', `Você precisa baixar o ${ob.face} de ${ob.naipe} antes de descartar!`);
+                // Se a carta ainda está na mão, o jogador TEM que baixar ela.
+                if(socket) socket.emit('erroJogo', `Baixe a carta do lixo (${ob.face} de ${ob.naipe}) antes de descartar!`);
                 return;
             } else {
-                // Carta não está mais na mão - já foi jogada - LIBERA
-                console.log('✅ Carta obrigatória já foi jogada. Liberando...');
-                sala.jogo.obrigacaoTopoLixo = null; 
+                // A carta sumiu da mão = Jogador já usou. Destrava.
+                console.log("⚠️ Obrigação limpa no descarte (carta não encontrada na mão).");
+                sala.jogo.obrigacaoTopoLixo = null;
             }
         }
 
         const carta = mao.splice(indexCarta, 1)[0];
         sala.jogo.lixo.push(carta);
+        console.log(`🗑️ Jogador ${idx+1} descartou:`, carta.face, carta.naipe);
         
         // --- RECOMPRA ---
         if (sala.jogo.permitirRecompra) {
             const ehACartaDaRecompra = (carta.id === sala.jogo.idCartaRecompra);
             
-            // Sempre desativa para o próximo turno
             sala.jogo.permitirRecompra = false;
             sala.jogo.primeiraCompra = false;
 
@@ -339,6 +334,7 @@ if (sala.jogo.obrigacaoTopoLixo) {
             }
         }
 
+        // Verifica Batida
         if (mao.length === 0) {
             const idEq = idx % 2;
             const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
@@ -350,6 +346,7 @@ if (sala.jogo.obrigacaoTopoLixo) {
                     encerrarPartida(sala, idEq);
                     return;
                 } else {
+                    // Batida inválida sem canastra: devolve carta
                     mao.push(carta); 
                     sala.jogo.lixo.pop();
                     if(socket) socket.emit('erroJogo', 'Precisa de canastra para bater!');
@@ -361,7 +358,6 @@ if (sala.jogo.obrigacaoTopoLixo) {
 
         sala.vez = (sala.vez + 1) % 4;
         sala.estadoTurno = 'comprando';
-        
         broadcastEstado(sala);
         verificarVezBot(sala);
     }
@@ -502,6 +498,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
