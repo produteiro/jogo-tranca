@@ -23,6 +23,13 @@ window.onload = function() {
             if(user && user.nome) socket.emit('loginAnonimo', user.nome);
         } catch(e) { console.error(e); }
     }
+    
+    // Garantia de Bind nos botões globais (caso o HTML não tenha onclick)
+    const btnDescartar = document.getElementById('btn-descartar');
+    if(btnDescartar) btnDescartar.onclick = acaoDescartar;
+    
+    const btnBaixar = document.getElementById('btn-baixar-jogo');
+    if(btnBaixar) btnBaixar.onclick = acaoBaixar;
 };
 
 function jogarAnonimo() {
@@ -90,7 +97,7 @@ function atualizarMesa(sala) {
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
 
-    // 3. Adversários (Sem erro de variável duplicada)
+    // 3. Adversários
     const contagemMaos = sala.maosCount || [0,0,0,0];
     const idxDireita  = (meuIndex + 1) % 4;
     const idxTopo     = (meuIndex + 2) % 4;
@@ -127,6 +134,7 @@ function atualizarMonte(sala) {
     }
 }
 
+// --- CORREÇÃO PRINCIPAL: Permitir clique no lixo vazio para descarte ---
 function atualizarLixo(sala, estado) {
     const divLixo = document.getElementById('carta-lixo');
     const areaLixo = document.getElementById('lixo');
@@ -136,21 +144,35 @@ function atualizarLixo(sala, estado) {
     
     divLixo.innerHTML = '';
     areaLixo.classList.remove('ativo-brilhando');
-    areaLixo.onclick = null;
-
+    
+    // Configura o visual
     if (qtd > 0) {
         const topo = sala.jogo.lixo[qtd - 1];
         divLixo.innerHTML = `<div class="carta"><img src="${getImgUrl(topo)}"></div>`;
-        
-        areaLixo.onclick = () => {
-            if (!turnoAtivo) return;
-            if (estado === 'comprando') socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
-            else if (estado === 'descartando') acaoDescartar();
-        };
-        
         if (turnoAtivo && estado === 'comprando') areaLixo.classList.add('ativo-brilhando');
     } else {
         divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:12px;">LIXO</div>';
+    }
+
+    // Configura a interação (O bug estava aqui: não definia onclick se qtd == 0)
+    areaLixo.onclick = () => {
+        if (!turnoAtivo) return;
+        
+        console.log('👆 Clique no Lixo. Estado:', estado, 'Qtd:', qtd);
+
+        if (estado === 'comprando') {
+            if (qtd > 0) socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
+        } else if (estado === 'descartando') {
+            // Permite descarte mesmo se o lixo estiver vazio
+            acaoDescartar();
+        }
+    };
+    
+    // Cursor pointer se puder interagir
+    if (turnoAtivo && (estado === 'descartando' || (estado === 'comprando' && qtd > 0))) {
+        areaLixo.style.cursor = 'pointer';
+    } else {
+        areaLixo.style.cursor = 'default';
     }
 }
 
@@ -190,18 +212,13 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
         const grupo = document.createElement('div');
         grupo.className = 'grupo-baixado';
         
-        // CORREÇÃO: Clique direto no grupo para adicionar cartas (qualquer quantidade)
         if (ehMeu && turnoAtivo) {
             grupo.style.cursor = 'pointer';
             grupo.onclick = (e) => {
                 e.stopPropagation();
                 if (cartasSelecionadas.length > 0) {
-                    // ✅ NOVO: Converte índices em IDs
                     const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
-                    if (!mao) {
-                        console.error('❌ Mão não encontrada');
-                        return;
-                    }
+                    if (!mao) return;
                     
                     const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
                     console.log('🎯 Adicionando cartas ao jogo', idxJogo, '- IDs:', ids);
@@ -209,7 +226,7 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
                     socket.emit('jogada', { 
                         acao: 'baixarJogo', 
                         dados: { 
-                            ids: ids,  // ✅ Mudou de 'indices' para 'ids'
+                            ids: ids, 
                             indexJogoMesa: idxJogo 
                         } 
                     });
@@ -219,7 +236,6 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
             };
         }
 
-        // Renderiza as cartas do grupo
         jogo.forEach(c => {
             const card = document.createElement('div');
             card.className = 'carta';
@@ -254,7 +270,6 @@ function renderizarTresVermelhos(sala) {
 function desenharMaoAdversario(idDiv, qtd) {
     const div = document.getElementById(idDiv);
     if(!div) return;
-    // Limpa cartas antigas (mantém info-player)
     Array.from(div.children).forEach(c => { if(c.classList.contains('carta-miniatura')) c.remove(); });
     for(let i=0; i<qtd; i++) {
         const c = document.createElement('div');
@@ -296,9 +311,8 @@ window.acaoDescartar = function() {
     }
     
     const indexCarta = cartasSelecionadas[0];
-    
-    // ✅ NOVO: Pega o ID da carta ao invés do índice
     const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
+    
     if (!mao || !mao[indexCarta]) {
         console.error('❌ Carta não encontrada na mão');
         return;
@@ -307,17 +321,14 @@ window.acaoDescartar = function() {
     const cartaId = mao[indexCarta].id;
     console.log(`🗑️ Enviando descarte: Index ${indexCarta} → ID ${cartaId}`);
     
-    // ✅ Envia o ID da carta
     socket.emit('jogada', { 
         acao: 'descartar', 
-        dados: { id: cartaId }  // ✅ Mudou de 'index' para 'id'
+        dados: { id: cartaId } 
     });
     
-    // Limpeza visual imediata para feedback
     cartasSelecionadas = [];
     ultimaCartaCompradaId = null;
     
-    // Força atualização visual dos botões
     const btnDescartar = document.getElementById('btn-descartar');
     if(btnDescartar) btnDescartar.style.display = 'none';
 };
@@ -325,25 +336,17 @@ window.acaoDescartar = function() {
 window.acaoBaixar = function() {
     if(cartasSelecionadas.length < 3) return alert("Selecione 3+ cartas");
     
-    // ✅ NOVO: Converte índices em IDs
     const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
-    if (!mao) {
-        console.error('❌ Mão não encontrada');
-        return;
-    }
+    if (!mao) return;
     
     const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
-    if (ids.length !== cartasSelecionadas.length) {
-        console.error('❌ Algumas cartas não foram encontradas');
-        return;
-    }
     
     console.log('📥 Baixando jogo com IDs:', ids);
     
     socket.emit('jogada', { 
         acao: 'baixarJogo', 
         dados: { 
-            ids: ids,  // ✅ Mudou de 'indices' para 'ids'
+            ids: ids, 
             indexJogoMesa: null 
         } 
     });
@@ -359,7 +362,7 @@ window.jogarAnonimo = jogarAnonimo;
 window.fazerLogin = fazerLogin;
 window.entrarModoTreino = entrarModoTreino;
 
-// Aliases
+// Aliases para onclick no HTML
 window.tentarBaixarJogo = window.acaoBaixar;
 window.descartarCartaSelecionadas = window.acaoDescartar;
 window.limparSelecao = window.acaoLimpar;
@@ -396,7 +399,6 @@ socket.on('fimDeJogo', (dados) => {
     
     modal.style.display = 'flex';
     
-    // Função para preencher as colunas (p1 = Nós, p2 = Eles)
     const preencher = (prefixo, d) => {
         const setTxt = (id, val) => {
             const el = document.getElementById(id);
@@ -411,7 +413,6 @@ socket.on('fimDeJogo', (dados) => {
         setTxt(prefixo + '-suja', d.ptsCanastrasSujas || 0);
         setTxt(prefixo + '-3ver', d.pts3Vermelhos || 0);
         
-        // Soma pontos das cartas na mão (negativo) + mesa (positivo)
         const totalCartas = (d.ptsCartasMao || 0) + (d.ptsCartasMesa || 0);
         setTxt(prefixo + '-cartas', totalCartas);
     };
@@ -429,20 +430,14 @@ socket.on('fimDeJogo', (dados) => {
     }
 });
 
-// --- CORREÇÃO: Função que estava faltando e travava o jogo ---
 function atualizarVisualSelecao() {
     if (!ultimoEstadoSala || meuIndex === -1) return;
-    
-    // Re-renderiza a mão para mostrar as bordas verdes nas cartas selecionadas
     renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]);
-    
-    // Atualiza visibilidade dos botões (Baixar/Descartar)
     atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 }
 
 function jogarNovamente() {
     console.log('🔄 Iniciando nova partida...');
-    
     const modalFim = document.getElementById('modal-fim');
     if (modalFim) modalFim.style.display = 'none';
     
@@ -452,10 +447,5 @@ function jogarNovamente() {
     ultimoEstadoSala = null;
     
     socket.emit('resetJogo');
-    console.log('✅ Pedido de reset enviado');
 }
-
-// No final do arquivo:
 window.jogarNovamente = jogarNovamente;
-
-
