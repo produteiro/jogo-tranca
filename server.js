@@ -186,11 +186,9 @@ const gameActions = {
             const todoLixo = sala.jogo.lixo.splice(0);
             sala.jogo[`maoJogador${idx + 1}`] = mao.concat(todoLixo);
             
-            sala.jogo.obrigacaoTopoLixo = {
-                id: cartaTopo.id,
-                face: cartaTopo.face,
-                naipe: cartaTopo.naipe
-            };
+        // ✅ Salva só o ID (já é descritivo)
+            sala.jogo.obrigacaoTopoLixo = cartaTopo.id;
+            console.log('🔒 Obrigação definida:', cartaTopo.id);
 
             console.log('🔒 Obrigação definida:', sala.jogo.obrigacaoTopoLixo);
             
@@ -208,13 +206,38 @@ const gameActions = {
         }
     },
 
-    baixarJogo: (sala, idx, dados, socket) => {
+baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) return; 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
-        const cartas = dados.indices.map(i => mao[i]);
+        
+        // ✅ Aceita tanto IDs quanto índices (retrocompatibilidade)
+        let cartas;
+        if (dados.ids) {
+            // Novo formato: usa IDs
+            cartas = dados.ids.map(id => mao.find(c => c.id === id));
+            
+            // Valida se todas as cartas foram encontradas
+            if (cartas.some(c => !c)) {
+                console.error('❌ Carta não encontrada:', dados.ids);
+                if(socket) socket.emit('erroJogo', 'Cartas não encontradas na mão!');
+                return;
+            }
+        } else if (dados.indices) {
+            // Formato antigo: usa índices (retrocompatibilidade)
+            cartas = dados.indices.map(i => mao[i]);
+        } else {
+            console.error('❌ Dados inválidos:', dados);
+            return;
+        }
+        
+        console.log('🎴 Baixando jogo com cartas:', cartas.map(c => c.id));
 
-if (sala.jogo.obrigacaoTopoLixo) {
-            const ob = sala.jogo.obrigacaoTopoLixo;
+        if (validarJogo(jogoFinal)) {
+            // ✅ Remove cartas por ID
+            cartas.forEach(carta => {
+                const idx = mao.findIndex(c => c.id === carta.id);
+                if (idx !== -1) mao.splice(idx, 1);
+            });
             const cumpriu = cartas.some(c => 
                 c.id === ob.id || 
                 (c.face === ob.face && c.naipe === ob.naipe)
@@ -255,23 +278,35 @@ if (sala.jogo.obrigacaoTopoLixo) {
         }
     },
 
-    descartarCarta: (sala, idx, indexCarta, socket) => {
+    descartarCarta: (sala, idx, cartaIdOuIndex, socket) => {
         if (sala.vez !== idx) return;
         const mao = sala.jogo[`maoJogador${idx + 1}`];
-        if (!mao || !mao[indexCarta]) return;
+        
+        // ✅ Aceita ID ou índice
+        let indexCarta;
+        if (typeof cartaIdOuIndex === 'string') {
+            // É um ID
+            indexCarta = mao.findIndex(c => c.id === cartaIdOuIndex);
+            if (indexCarta === -1) {
+                console.error('❌ Carta não encontrada:', cartaIdOuIndex);
+                if(socket) socket.emit('erroJogo', 'Carta não encontrada!');
+                return;
+            }
+            console.log('🗑️ Descartando carta ID:', cartaIdOuIndex);
+        } else {
+            // É um índice (retrocompatibilidade)
+            indexCarta = cartaIdOuIndex;
+            if (!mao[indexCarta]) return;
+            console.log('🗑️ Descartando índice:', indexCarta, '→', mao[indexCarta]?.id);
+        }
 
 // --- TRAVA DE SEGURANÇA INTELIGENTE ---
-        if (sala.jogo.obrigacaoTopoLixo) {
+if (sala.jogo.obrigacaoTopoLixo) {
             const ob = sala.jogo.obrigacaoTopoLixo;
+            console.log('🔒 Verificando obrigação:', ob.id);
             
-            console.log('🔒 Verificando obrigação:', ob);
-            console.log('🃏 Mão atual:', mao.map(c => `${c.face}${c.naipe}`));
-            
-            // Verifica se a carta obrigatória ainda está na mão
-            const cartaAindaNaMao = mao.find(c => 
-                c.id === ob.id || 
-                (c.face === ob.face && c.naipe === ob.naipe)
-            );
+            // ✅ Busca por ID descritivo
+            const cartaAindaNaMao = mao.find(c => c.id === ob.id);
 
             if (cartaAindaNaMao) {
                 // Carta ainda na mão - BLOQUEIA
@@ -469,6 +504,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
