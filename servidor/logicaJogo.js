@@ -1,5 +1,30 @@
-const ordemValores = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"];
+const ordemValores = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
 const ordemSequencia = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]; // 2 entra como curinga ou natural
+
+// ==========================================
+// 🆕 GERAÇÃO DE IDS DESCRITIVOS
+// ==========================================
+
+function gerarIdCarta(face, naipe, origem) {
+    // Mapeia naipes PT → EN
+    const naipeMap = {
+        'ouros': 'd',    // diamonds
+        'copas': 'h',    // hearts
+        'espadas': 's',  // spades
+        'paus': 'c'      // clubs
+    };
+    
+    // Mapeia cores PT → EN
+    const corMap = {
+        'vermelho': 'r', // red
+        'azul': 'b'      // blue
+    };
+    
+    const naipeCode = naipeMap[naipe] || naipe[0];
+    const corCode = corMap[origem] || origem[0];
+    
+    return `${face}${naipeCode}${corCode}`;
+}
 
 function ordenarMaoServer(mao, modo = 'naipe') {
     if (!mao) return [];
@@ -99,38 +124,24 @@ function prepararPartida() {
     const naipes = ['copas', 'ouros', 'paus', 'espadas'];
     const faces = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']; 
     let baralho = [];
-    let id = 1;
+    
     ['azul', 'vermelho'].forEach(cor => {
         naipes.forEach(naipe => {
             faces.forEach(face => {
                 let pts = (face === 'A') ? 15 : (face === '2' || ['8','9','10','J','Q','K'].includes(face)) ? 10 : 5;
-                if (face === '3') pts = 5; 
-                baralho.push({ id: id++, face, naipe, pontos: pts, origem: cor });
+                if (face === '3') pts = 5;
+                
+                // ✅ Gera ID descritivo
+                baralho.push({ 
+                    id: gerarIdCarta(face, naipe, cor),  // ✅ "4dr", "Ksb", etc
+                    face, 
+                    naipe, 
+                    pontos: pts, 
+                    origem: cor 
+                });
             });
         });
     });
-    baralho = embaralhar(baralho);
-    return {
-        monte: baralho, 
-        lixo: [],
-        maoJogador1: ordenarMaoServer(baralho.splice(0, 11)),
-        maoJogador2: ordenarMaoServer(baralho.splice(0, 11)),
-        maoJogador3: ordenarMaoServer(baralho.splice(0, 11)),
-        maoJogador4: ordenarMaoServer(baralho.splice(0, 11)),
-        morto1: baralho.splice(0, 11), 
-        morto2: baralho.splice(0, 11),
-        tresVermelhos: [[], []], 
-        jogosNaMesa: [[], []], 
-        equipePegouMorto: [false, false],
-        obrigacaoTopoLixo: null, 
-        idsMaoAntesDaCompra: null,
-        preferenciasOrdenacao: { 0: 'naipe', 1: 'naipe', 2: 'naipe', 3: 'naipe' },
-        // 🆕 Sistema de primeira compra dupla
-        primeiraCompra: true,
-        primeiraCompraJogador: null,
-        permitirRecompra: false
-    };
-}
 
 function verificarSeEncaixa(jogo, carta) {
     return validarJogo([...jogo, carta]);
@@ -437,9 +448,11 @@ function encontrarSequencias(mao) {
     return sequencias;
 }
 
-module.exports = { 
+    module.exports = { 
     prepararPartida, validarJogo, verificarSeEncaixa, separarTresVermelhos, 
     ehTresVermelho, ordenarMaoServer, ordenarJogoMesa, temCanastra, 
     calcularResultadoFinal, calcularPlacarParcial, verificarPossibilidadeCompra,
-    encontrarTrincas, encontrarSequencias 
+    encontrarTrincas, encontrarSequencias,
+    gerarIdCarta  // ✅ Exporta a função
 };
+
