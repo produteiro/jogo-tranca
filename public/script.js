@@ -458,3 +458,4 @@ function jogarNovamente() {
 // No final do arquivo:
 window.jogarNovamente = jogarNovamente;
 
+
