@@ -120,20 +120,22 @@ function ordenarJogoMesa(cartas) {
     return resultado;
 }
 
+// ... (Mantenha o código anterior até a função prepararPartida)
+
 function prepararPartida() {
     const naipes = ['copas', 'ouros', 'paus', 'espadas'];
     const faces = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']; 
     let baralho = [];
     
+    // 1. Cria as cartas (2 Baralhos)
     ['azul', 'vermelho'].forEach(cor => {
         naipes.forEach(naipe => {
             faces.forEach(face => {
                 let pts = (face === 'A') ? 15 : (face === '2' || ['8','9','10','J','Q','K'].includes(face)) ? 10 : 5;
                 if (face === '3') pts = 5;
                 
-                // ✅ Gera ID descritivo
                 baralho.push({ 
-                    id: gerarIdCarta(face, naipe, cor),  // ✅ "4dr", "Ksb", etc
+                    id: gerarIdCarta(face, naipe, cor), 
                     face, 
                     naipe, 
                     pontos: pts, 
@@ -142,7 +144,51 @@ function prepararPartida() {
             });
         });
     });
+
+    // 2. Embaralha
+    baralho = embaralhar(baralho);
+
+    // 3. Inicializa o Objeto Jogo
+    const jogo = {
+        monte: [],
+        lixo: [],
+        morto1: [],
+        morto2: [],
+        maoJogador1: [],
+        maoJogador2: [],
+        maoJogador3: [],
+        maoJogador4: [],
+        jogosNaMesa: [[], []], 
+        tresVermelhos: [[], []], 
+        equipePegouMorto: [false, false],
+        
+        primeiraCompra: true,
+        primeiraCompraJogador: -1,
+        permitirRecompra: false,
+        idCartaRecompra: null,
+        obrigacaoTopoLixo: null,
+        preferenciasOrdenacao: {} 
+    };
+
+    // 4. Distribui as Cartas
+    for (let i = 0; i < 11; i++) jogo.morto1.push(baralho.pop());
+    for (let i = 0; i < 11; i++) jogo.morto2.push(baralho.pop());
+
+    for (let i = 0; i < 11; i++) {
+        jogo.maoJogador1.push(baralho.pop());
+        jogo.maoJogador2.push(baralho.pop());
+        jogo.maoJogador3.push(baralho.pop());
+        jogo.maoJogador4.push(baralho.pop());
+    }
+    
+    jogo.lixo.push(baralho.pop());
+    jogo.monte = baralho;
+
+    // 5. IMPORTANTE: Retorna o objeto jogo!
+    return jogo;
 }
+
+// ... (Mantenha o resto do arquivo igual)
 
 function verificarSeEncaixa(jogo, carta) {
     return validarJogo([...jogo, carta]);
@@ -456,5 +502,6 @@ function encontrarSequencias(mao) {
     encontrarTrincas, encontrarSequencias,
     gerarIdCarta  // ✅ Exporta a função
 };
+
 
 
