@@ -239,7 +239,7 @@ html, body {
     flex-wrap: wrap;
     gap: 30px;
     padding: 10px 50px;
-    margin-bottom: 20px;
+    margin-bottom: 100px; /* <--- AUMENTADO: Evita que os jogos fiquem escondidos atrás da mão */
     position: relative;
     z-index: 10;
 }
@@ -387,4 +387,5 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
