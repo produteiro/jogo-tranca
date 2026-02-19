@@ -197,6 +197,7 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
     const div = document.getElementById(idDiv);
     if (!div) return;
     
+    // Mantém a marca d'água se existir
     const watermark = div.querySelector('.watermark');
     div.innerHTML = '';
     if (watermark) div.appendChild(watermark);
@@ -205,10 +206,11 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
     
     jogos.forEach((jogo, idxJogo) => {
         const grupo = document.createElement('div');
-        grupo.className = 'grupo-baixado';
+        grupo.className = 'grupo-baixado'; // O CSS cuida do layout horizontal
         
         if (ehMeu && turnoAtivo) {
             grupo.style.cursor = 'pointer';
+            grupo.title = "Clique para adicionar cartas a este jogo";
             grupo.onclick = (e) => {
                 e.stopPropagation();
                 if (cartasSelecionadas.length > 0) {
@@ -216,15 +218,12 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
                     if (!mao) return;
                     
                     const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
-                    console.log('🎯 Adicionando cartas ao jogo', idxJogo, '- IDs:', ids);
                     
                     socket.emit('jogada', { 
                         acao: 'baixarJogo', 
-                        dados: { 
-                            ids: ids, 
-                            indexJogoMesa: idxJogo 
-                        } 
+                        dados: { ids: ids, indexJogoMesa: idxJogo } 
                     });
+                    
                     cartasSelecionadas = [];
                     atualizarVisualSelecao();
                 }
@@ -530,3 +529,4 @@ function atualizarVisualMortos(sala) {
         divMortos.appendChild(imgM2);
     }
 }
+
