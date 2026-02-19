@@ -14,6 +14,11 @@ function getImgUrl(c) {
     return `https://deckofcardsapi.com/static/img/${f}${n}.png`;
 }
 
+// --- ESCUTADOR DE ERRO (Crucial para não achar que o jogo travou) ---
+socket.on('erroJogo', (msg) => {
+    alert("❌ AÇÃO INVÁLIDA:\n\n" + msg);
+});
+
 // --- LOGIN ---
 window.onload = function() {
     const sessao = localStorage.getItem('tranca_sessao');
@@ -23,13 +28,6 @@ window.onload = function() {
             if(user && user.nome) socket.emit('loginAnonimo', user.nome);
         } catch(e) { console.error(e); }
     }
-    
-    // Garantia de Bind nos botões globais (caso o HTML não tenha onclick)
-    const btnDescartar = document.getElementById('btn-descartar');
-    if(btnDescartar) btnDescartar.onclick = acaoDescartar;
-    
-    const btnBaixar = document.getElementById('btn-baixar-jogo');
-    if(btnBaixar) btnBaixar.onclick = acaoBaixar;
 };
 
 function jogarAnonimo() {
@@ -75,7 +73,6 @@ function atualizarMesa(sala) {
     turnoAtivo = (sala.vez === meuIndex);
     const estado = sala.estadoTurno;
 
-    // Header
     const info = document.getElementById('info-jogo');
     if(info) {
         const nomeVez = turnoAtivo ? "SUA VEZ" : `VEZ DE: ${sala.jogadores[sala.vez] || 'BOT'}`;
@@ -83,15 +80,11 @@ function atualizarMesa(sala) {
         info.style.color = turnoAtivo ? '#f1c40f' : '#fff';
     }
 
-    // 1. Placar com Ícone de Morto (Novo)
     atualizarPlacarComIndicadores(sala);
-
-    // 2. Mesa, Lixo e Mortos Visuais (Novo)
     atualizarMonte(sala);
     atualizarLixo(sala, estado);
-    atualizarVisualMortos(sala); // <-- Chama a função corrigida
+    atualizarVisualMortos(sala);
 
-    // Adversários
     const contagemMaos = sala.maosCount || [0,0,0,0];
     const idxDireita  = (meuIndex + 1) % 4;
     const idxTopo     = (meuIndex + 2) % 4;
@@ -101,7 +94,6 @@ function atualizarMesa(sala) {
     desenharMaoAdversario('mao-topo', contagemMaos[idxTopo]);
     desenharMaoAdversario('mao-esquerda', contagemMaos[idxEsquerda]);
 
-    // Mão e Jogos
     renderizarMinhaMao(sala.jogo[`maoJogador${meuIndex+1}`]);
 
     const idEq = meuIndex % 2;
@@ -121,15 +113,20 @@ function atualizarMonte(sala) {
     if (elMonte) {
         elMonte.style.opacity = (qtd === 0) ? '0.3' : '1';
         elMonte.classList.remove('ativo-brilhando');
-        elMonte.onclick = null;
+        
+        elMonte.onclick = () => {
+            if (!turnoAtivo) return;
+            if (sala.estadoTurno === 'comprando' && qtd > 0) {
+                socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
+            }
+        };
+
         if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
             elMonte.classList.add('ativo-brilhando');
-            elMonte.onclick = () => socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
         }
     }
 }
 
-// --- CORREÇÃO PRINCIPAL: Permitir clique no lixo vazio para descarte ---
 function atualizarLixo(sala, estado) {
     const divLixo = document.getElementById('carta-lixo');
     const areaLixo = document.getElementById('lixo');
@@ -139,8 +136,7 @@ function atualizarLixo(sala, estado) {
     
     divLixo.innerHTML = '';
     areaLixo.classList.remove('ativo-brilhando');
-    
-    // Configura o visual
+
     if (qtd > 0) {
         const topo = sala.jogo.lixo[qtd - 1];
         divLixo.innerHTML = `<div class="carta"><img src="${getImgUrl(topo)}"></div>`;
@@ -148,27 +144,15 @@ function atualizarLixo(sala, estado) {
     } else {
         divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:12px;">LIXO</div>';
     }
-
-    // Configura a interação (O bug estava aqui: não definia onclick se qtd == 0)
+    
     areaLixo.onclick = () => {
         if (!turnoAtivo) return;
-        
-        console.log('👆 Clique no Lixo. Estado:', estado, 'Qtd:', qtd);
-
         if (estado === 'comprando') {
             if (qtd > 0) socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
         } else if (estado === 'descartando') {
-            // Permite descarte mesmo se o lixo estiver vazio
             acaoDescartar();
         }
     };
-    
-    // Cursor pointer se puder interagir
-    if (turnoAtivo && (estado === 'descartando' || (estado === 'comprando' && qtd > 0))) {
-        areaLixo.style.cursor = 'pointer';
-    } else {
-        areaLixo.style.cursor = 'default';
-    }
 }
 
 function renderizarMinhaMao(cartas) {
@@ -197,7 +181,6 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
     const div = document.getElementById(idDiv);
     if (!div) return;
     
-    // Mantém a marca d'água se existir
     const watermark = div.querySelector('.watermark');
     div.innerHTML = '';
     if (watermark) div.appendChild(watermark);
@@ -206,11 +189,10 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
     
     jogos.forEach((jogo, idxJogo) => {
         const grupo = document.createElement('div');
-        grupo.className = 'grupo-baixado'; // O CSS cuida do layout horizontal
+        grupo.className = 'grupo-baixado';
         
         if (ehMeu && turnoAtivo) {
             grupo.style.cursor = 'pointer';
-            grupo.title = "Clique para adicionar cartas a este jogo";
             grupo.onclick = (e) => {
                 e.stopPropagation();
                 if (cartasSelecionadas.length > 0) {
@@ -218,12 +200,10 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
                     if (!mao) return;
                     
                     const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
-                    
                     socket.emit('jogada', { 
                         acao: 'baixarJogo', 
                         dados: { ids: ids, indexJogoMesa: idxJogo } 
                     });
-                    
                     cartasSelecionadas = [];
                     atualizarVisualSelecao();
                 }
@@ -292,59 +272,70 @@ function atualizarBotoesAcao(estado) {
     }
 }
 
-// Ações Globais
-window.acaoDescartar = function() {
-    if (!turnoAtivo) {
-        console.log("❌ Tentativa de descarte fora da vez.");
-        return;
+function atualizarVisualMortos(sala) {
+    const divMortos = document.getElementById('area-mortos');
+    if (!divMortos) return;
+    divMortos.innerHTML = ''; 
+    const estiloBase = 'width: 75px; position: absolute; left: 50%; top: 50%; border-radius: 6px; box-shadow: 2px 2px 8px rgba(0,0,0,0.6); transition: all 0.3s ease;';
+
+    if (sala.jogo.morto1 && sala.jogo.morto1.length > 0) {
+        const imgM1 = document.createElement('img');
+        imgM1.src = 'https://deckofcardsapi.com/static/img/back.png';
+        imgM1.className = 'carta-morto';
+        imgM1.style.cssText = `${estiloBase} transform: translate(-50%, -50%); z-index: 1;`;
+        divMortos.appendChild(imgM1);
     }
+
+    if (sala.jogo.morto2 && sala.jogo.morto2.length > 0) {
+        const imgM2 = document.createElement('img');
+        imgM2.src = 'https://deckofcardsapi.com/static/img/back.png';
+        imgM2.className = 'carta-morto';
+        imgM2.style.cssText = `${estiloBase} transform: translate(-50%, -50%) rotate(90deg); z-index: 2;`;
+        divMortos.appendChild(imgM2);
+    }
+}
+
+function atualizarPlacarComIndicadores(sala) {
+    if (!sala.placarCalculado) return;
+    const idMinhaEquipe = meuIndex % 2; 
+    const idEquipeAdv = (idMinhaEquipe + 1) % 2;
+    const ptsNos = (idMinhaEquipe === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
+    const ptsEles = (idMinhaEquipe === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
+    const nosPegamosMorto = sala.jogo.equipePegouMorto[idMinhaEquipe];
+    const elesPegaramMorto = sala.jogo.equipePegouMorto[idEquipeAdv];
+    const icone = ' <span style="color:#2ecc71; font-size:16px; margin-left:5px;" title="Pegou o morto">✅</span>';
+    const elNos = document.getElementById('pts-nos');
+    const elEles = document.getElementById('pts-eles');
     
-    if (cartasSelecionadas.length !== 1) {
-        alert("Selecione EXATAMENTE 1 carta para descartar.");
-        return;
-    }
+    if(elNos) elNos.innerHTML = ptsNos + (nosPegamosMorto ? icone : '');
+    if(elEles) elEles.innerHTML = ptsEles + (elesPegaramMorto ? icone : '');
+}
+
+window.acaoDescartar = function() {
+    if (!turnoAtivo) return;
+    if (cartasSelecionadas.length !== 1) return;
     
     const indexCarta = cartasSelecionadas[0];
     const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
-    
-    if (!mao || !mao[indexCarta]) {
-        console.error('❌ Carta não encontrada na mão');
-        return;
-    }
-    
-    const cartaId = mao[indexCarta].id;
-    console.log(`🗑️ Enviando descarte: Index ${indexCarta} → ID ${cartaId}`);
+    if (!mao || !mao[indexCarta]) return;
     
     socket.emit('jogada', { 
         acao: 'descartar', 
-        dados: { id: cartaId } 
+        dados: { id: mao[indexCarta].id }
     });
     
     cartasSelecionadas = [];
     ultimaCartaCompradaId = null;
-    
-    const btnDescartar = document.getElementById('btn-descartar');
-    if(btnDescartar) btnDescartar.style.display = 'none';
+    atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 };
 
 window.acaoBaixar = function() {
     if(cartasSelecionadas.length < 3) return alert("Selecione 3+ cartas");
-    
     const mao = ultimoEstadoSala?.jogo?.[`maoJogador${meuIndex + 1}`];
     if (!mao) return;
     
     const ids = cartasSelecionadas.map(idx => mao[idx]?.id).filter(Boolean);
-    
-    console.log('📥 Baixando jogo com IDs:', ids);
-    
-    socket.emit('jogada', { 
-        acao: 'baixarJogo', 
-        dados: { 
-            ids: ids, 
-            indexJogoMesa: null 
-        } 
-    });
-    
+    socket.emit('jogada', { acao: 'baixarJogo', dados: { ids: ids, indexJogoMesa: null } });
     cartasSelecionadas = [];
 };
 
@@ -356,13 +347,11 @@ window.jogarAnonimo = jogarAnonimo;
 window.fazerLogin = fazerLogin;
 window.entrarModoTreino = entrarModoTreino;
 
-// Aliases para onclick no HTML
 window.tentarBaixarJogo = window.acaoBaixar;
 window.descartarCartaSelecionadas = window.acaoDescartar;
 window.limparSelecao = window.acaoLimpar;
 window.alternarOrdenacao = window.acaoOrdenar;
 
-// Chat
 window.toggleChat = function() {
     const chat = document.getElementById('janela-chat');
     chat.style.display = (chat.style.display === 'none') ? 'flex' : 'none';
@@ -387,35 +376,25 @@ socket.on('receberChat', (dados) => {
 });
 
 socket.on('fimDeJogo', (dados) => {
-    console.log('🏁 FIM DE JOGO:', dados);
     const modal = document.getElementById('modal-fim');
     if (!modal) return;
-    
     modal.style.display = 'flex';
     
     const preencher = (prefixo, d) => {
-        const setTxt = (id, val) => {
-            const el = document.getElementById(id);
-            if(el) el.innerText = val;
-        };
-
+        const setTxt = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; };
         if (!d) return;
-
         setTxt(prefixo + '-batida', d.ptsBatida || 0);
         setTxt(prefixo + '-morto', d.ptsMorto || 0);
         setTxt(prefixo + '-limpa', d.ptsCanastrasLimpas || 0);
         setTxt(prefixo + '-suja', d.ptsCanastrasSujas || 0);
         setTxt(prefixo + '-3ver', d.pts3Vermelhos || 0);
-        
-        const totalCartas = (d.ptsCartasMao || 0) + (d.ptsCartasMesa || 0);
-        setTxt(prefixo + '-cartas', totalCartas);
+        setTxt(prefixo + '-cartas', (d.ptsCartasMao || 0) + (d.ptsCartasMesa || 0));
     };
 
     if (dados.detalhes) {
         preencher('p1', dados.detalhes.p1);
         preencher('p2', dados.detalhes.p2);
     }
-    
     if (dados.placar) {
         const elTotalP1 = document.getElementById('p1-total');
         const elTotalP2 = document.getElementById('p2-total');
@@ -430,103 +409,9 @@ function atualizarVisualSelecao() {
     atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 }
 
-function jogarNovamente() {
-    console.log('🔄 Iniciando nova partida...');
+window.jogarNovamente = function() {
     const modalFim = document.getElementById('modal-fim');
     if (modalFim) modalFim.style.display = 'none';
-    
-    meuIndex = -1;
-    turnoAtivo = false;
-    cartasSelecionadas = [];
-    ultimoEstadoSala = null;
-    
+    meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
-}
-window.jogarNovamente = jogarNovamente;
-
-// --- MELHORIA 1: VISUAL DO MORTO (Corrigido ID 'area-mortos') ---
-function atualizarVisualMortos(sala) {
-    // Busca pelo ID correto que está no seu HTML
-    const divMortos = document.getElementById('area-mortos');
-    if (!divMortos) return;
-
-    // Limpa o conteúdo estático (as divs antigas morto1/morto2 somem aqui)
-    divMortos.innerHTML = ''; 
-
-    // Se Morto 1 ainda existe no servidor
-    if (sala.jogo.morto1 && sala.jogo.morto1.length > 0) {
-        const imgM1 = document.createElement('img');
-        imgM1.src = 'https://deckofcardsapi.com/static/img/back.png';
-        imgM1.className = 'carta-morto';
-        // Posicionamento visual
-        imgM1.style.cssText = 'width: 70px; position: absolute; left: 10px; top: 10px; border-radius: 5px; box-shadow: 2px 2px 5px black;';
-        divMortos.appendChild(imgM1);
-    }
-
-    // Se Morto 2 ainda existe no servidor
-    if (sala.jogo.morto2 && sala.jogo.morto2.length > 0) {
-        const imgM2 = document.createElement('img');
-        imgM2.src = 'https://deckofcardsapi.com/static/img/back.png';
-        imgM2.className = 'carta-morto';
-        // Cruzado/Rotacionado visualmente
-        imgM2.style.cssText = 'width: 70px; position: absolute; left: 25px; top: 5px; transform: rotate(90deg); border-radius: 5px; box-shadow: 2px 2px 5px black;';
-        divMortos.appendChild(imgM2);
-    }
-}
-
-// --- MELHORIA 2: PLACAR COM INDICADOR DE QUEM PEGOU O MORTO ---
-function atualizarPlacarComIndicadores(sala) {
-    if (!sala.placarCalculado) return;
-
-    const idMinhaEquipe = meuIndex % 2; 
-    const idEquipeAdv = (idMinhaEquipe + 1) % 2;
-
-    const ptsNos = (idMinhaEquipe === 0) ? sala.placarCalculado.p1.total : sala.placarCalculado.p2.total;
-    const ptsEles = (idMinhaEquipe === 0) ? sala.placarCalculado.p2.total : sala.placarCalculado.p1.total;
-
-    // Verifica status do morto
-    const nosPegamosMorto = sala.jogo.equipePegouMorto[idMinhaEquipe];
-    const elesPegaramMorto = sala.jogo.equipePegouMorto[idEquipeAdv];
-
-    // Ícone de "Check" verde se pegou
-    const icone = ' <span style="color:#2ecc71; font-size:16px; margin-left:5px;" title="Pegou o morto">✅</span>';
-
-    // Atualiza HTML
-    const elNos = document.getElementById('pts-nos');
-    const elEles = document.getElementById('pts-eles');
-    
-    if(elNos) elNos.innerHTML = ptsNos + (nosPegamosMorto ? icone : '');
-    if(elEles) elEles.innerHTML = ptsEles + (elesPegaramMorto ? icone : '');
-}
-
-// --- MELHORIA: VISUAL DO MORTO EM CRUZ CENTRALIZADA ---
-function atualizarVisualMortos(sala) {
-    const divMortos = document.getElementById('area-mortos');
-    if (!divMortos) return;
-
-    divMortos.innerHTML = ''; 
-
-    // Estilo base comum para centralizar absolutamente
-    const estiloBase = 'width: 75px; position: absolute; left: 50%; top: 50%; border-radius: 6px; box-shadow: 2px 2px 8px rgba(0,0,0,0.6); transition: all 0.3s ease;';
-
-    // Morto 1: Vertical (Fundo)
-    if (sala.jogo.morto1 && sala.jogo.morto1.length > 0) {
-        const imgM1 = document.createElement('img');
-        imgM1.src = 'https://deckofcardsapi.com/static/img/back.png';
-        imgM1.className = 'carta-morto';
-        // Centraliza exato no meio
-        imgM1.style.cssText = `${estiloBase} transform: translate(-50%, -50%); z-index: 1;`;
-        divMortos.appendChild(imgM1);
-    }
-
-    // Morto 2: Horizontal (Topo, Cruzado)
-    if (sala.jogo.morto2 && sala.jogo.morto2.length > 0) {
-        const imgM2 = document.createElement('img');
-        imgM2.src = 'https://deckofcardsapi.com/static/img/back.png';
-        imgM2.className = 'carta-morto';
-        // Centraliza e rotaciona 90 graus
-        imgM2.style.cssText = `${estiloBase} transform: translate(-50%, -50%) rotate(90deg); z-index: 2;`;
-        divMortos.appendChild(imgM2);
-    }
-}
-
+};
