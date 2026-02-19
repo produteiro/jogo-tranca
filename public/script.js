@@ -114,12 +114,8 @@ function atualizarMonte(sala) {
         elMonte.style.opacity = (qtd === 0) ? '0.3' : '1';
         elMonte.classList.remove('ativo-brilhando');
         
-        elMonte.onclick = () => {
-            if (!turnoAtivo) return;
-            if (sala.estadoTurno === 'comprando' && qtd > 0) {
-                socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
-            }
-        };
+        // Usa a função global blindada
+        elMonte.onclick = window.acaoComprarMonte;
 
         if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
             elMonte.classList.add('ativo-brilhando');
@@ -145,14 +141,8 @@ function atualizarLixo(sala, estado) {
         divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:12px;">LIXO</div>';
     }
     
-    areaLixo.onclick = () => {
-        if (!turnoAtivo) return;
-        if (estado === 'comprando') {
-            if (qtd > 0) socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
-        } else if (estado === 'descartando') {
-            acaoDescartar();
-        }
-    };
+    // Usa a função global blindada
+    areaLixo.onclick = window.acaoComprarLixo;
 }
 
 function renderizarMinhaMao(cartas) {
@@ -311,6 +301,24 @@ function atualizarPlacarComIndicadores(sala) {
     if(elEles) elEles.innerHTML = ptsEles + (elesPegaramMorto ? icone : '');
 }
 
+window.acaoComprarMonte = function() {
+    console.log("👆 CLIQUE REGISTRADO: Comprar do Monte. Turno Ativo:", turnoAtivo);
+    if (!turnoAtivo || !ultimoEstadoSala) return;
+    if (ultimoEstadoSala.estadoTurno === 'comprando' && ultimoEstadoSala.jogo.monte.length > 0) {
+        socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
+    }
+};
+
+window.acaoComprarLixo = function() {
+    console.log("👆 CLIQUE REGISTRADO: Interagir com o Lixo. Turno Ativo:", turnoAtivo);
+    if (!turnoAtivo || !ultimoEstadoSala) return;
+    if (ultimoEstadoSala.estadoTurno === 'comprando' && ultimoEstadoSala.jogo.lixo.length > 0) {
+        socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
+    } else if (ultimoEstadoSala.estadoTurno === 'descartando') {
+        acaoDescartar();
+    }
+};
+
 window.acaoDescartar = function() {
     if (!turnoAtivo) return;
     if (cartasSelecionadas.length !== 1) return;
@@ -415,3 +423,4 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
