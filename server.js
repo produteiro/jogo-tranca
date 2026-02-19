@@ -418,10 +418,23 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('jogada', (dados) => {
+socket.on('jogada', (dados) => {
+        // A TRAVA ANTI-SILÊNCIO: Se o servidor perdeu a referência da sala deste socket
+        if (!socket.salaAtual || !salas[socket.salaAtual]) {
+            if(socket) socket.emit('erroJogo', 'Sua conexão oscilou e a sincronia foi perdida. Pressione F5 para atualizar e voltar exatamente de onde parou!');
+            return;
+        }
+
         const s = salas[socket.salaAtual];
         if (!s || !s.jogo) return;
+        
         const meuIndex = s.jogadores.indexOf(socket.id);
+        
+        // Se o index for -1, ele não achou seu socket na lista de jogadores
+        if (meuIndex === -1) {
+             if(socket) socket.emit('erroJogo', 'Erro de identificação na cadeira. Pressione F5.');
+             return;
+        }
         
         if (dados.acao === 'comprarMonte') gameActions.comprarDoMonte(s, meuIndex, socket);
         else if (dados.acao === 'comprarLixo') gameActions.comprarLixo(s, meuIndex, null, socket);
@@ -455,6 +468,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
