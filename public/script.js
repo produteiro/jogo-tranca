@@ -214,22 +214,29 @@ function renderizarJogos(idDiv, jogos, ehMeu) {
 
 function renderizarTresVermelhos(sala) {
     if(!sala.jogo.tresVermelhos) return;
+
     const desenhar = (idDiv, cartas) => {
         const div = document.getElementById(idDiv);
-        if(!div || cartas.length === 0) return;
-        const grp = document.createElement('div');
-        grp.className = 'grupo-baixado tres-vermelhos-grupo';
-        grp.style.border = '2px dashed #e74c3c';
+        if(!div) return;
+        
+        div.innerHTML = ''; // Limpa a área
+        
         cartas.forEach(c => {
             const el = document.createElement('div');
-            el.className = 'carta tres-vermelho-bonus';
+            el.className = 'carta-mini-header'; // Aplica a nova classe do cabeçalho
             el.innerHTML = `<img src="${getImgUrl(c)}">`;
-            grp.appendChild(el);
+            el.title = "3 Vermelho (100 pontos)";
+            div.appendChild(el);
         });
-        div.prepend(grp);
     };
-    desenhar('meus-jogos', sala.jogo.tresVermelhos[meuIndex%2]);
-    desenhar('jogos-adversarios', sala.jogo.tresVermelhos[(meuIndex+1)%2]);
+
+    // Identifica corretamente quem é quem no placar
+    const idMinhaEquipe = meuIndex % 2;
+    const idEquipeAdv = (idMinhaEquipe + 1) % 2;
+
+    // Desenha nos novos IDs do cabeçalho
+    desenhar('tres-vermelhos-nos', sala.jogo.tresVermelhos[idMinhaEquipe]);
+    desenhar('tres-vermelhos-eles', sala.jogo.tresVermelhos[idEquipeAdv]);
 }
 
 function desenharMaoAdversario(idDiv, qtd) {
@@ -433,5 +440,6 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
 
 
