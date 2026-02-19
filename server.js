@@ -192,8 +192,17 @@ comprarDoMonte: (sala, idx, socket) => {
         }
     },
 
-    baixarJogo: (sala, idx, dados, socket) => {
-        if (sala.vez !== idx) return; 
+baixarJogo: (sala, idx, dados, socket) => {
+        if (sala.vez !== idx) {
+            if(socket) socket.emit('erroJogo', 'Não é a sua vez de jogar!');
+            return; 
+        }
+
+        if (sala.estadoTurno !== 'descartando') {
+            if(socket) socket.emit('erroJogo', 'Ação Inválida: Você precisa comprar do monte ou do lixo ANTES de baixar cartas na mesa!');
+            return;
+        }
+
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         
         let cartas = [];
@@ -214,6 +223,34 @@ comprarDoMonte: (sala, idx, socket) => {
         let jogoFinal = [...jogoAlvo, ...cartas];
 
         if (validarJogo(jogoFinal)) {
+            
+            // --- NOVA VALIDAÇÃO: TRAVA DE BATIDA SEM CANASTRA ---
+            const jaPegouMorto = sala.jogo.equipePegouMorto[idEquipe];
+            const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
+            const cartasRestantes = mao.length - cartas.length;
+
+            // Simula como a mesa vai ficar para saber se essa jogada forma uma canastra
+            let jogosMesaSimulado = [...sala.jogo.jogosNaMesa[idEquipe]];
+            if (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) {
+                jogosMesaSimulado[dados.indexJogoMesa] = jogoFinal;
+            } else {
+                jogosMesaSimulado.push(jogoFinal);
+            }
+            const teraCanastra = temCanastra(jogosMesaSimulado);
+
+            // Se a equipe não tem canastra e não tem como pegar um morto
+            if ((jaPegouMorto || !temMortoDisponivel) && !teraCanastra) {
+                if (cartasRestantes === 0) {
+                    if(socket) socket.emit('erroJogo', 'Ação Inválida: Você precisa ter pelo menos uma canastra para bater direto.');
+                    return; // Aborta a jogada
+                }
+                if (cartasRestantes === 1) {
+                    if(socket) socket.emit('erroJogo', 'Ação Inválida: Você não pode baixar este jogo pois ficaria com apenas 1 carta e seria obrigado a bater sem ter canastra no descarte.');
+                    return; // Aborta a jogada
+                }
+            }
+            // ----------------------------------------------------
+
             if (sala.jogo.obrigacaoTopoLixo) {
                 const obId = sala.jogo.obrigacaoTopoLixo;
                 if (cartas.some(c => c.id === obId)) {
@@ -235,8 +272,8 @@ comprarDoMonte: (sala, idx, socket) => {
             }
             
             if (mao.length === 0) {
-                const temMortoDisponivel = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
-                if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDisponivel) entregarMorto(sala, idx);
+                const temMortoDispAtualizado = sala.jogo.morto1.length > 0 || sala.jogo.morto2.length > 0;
+                if (!sala.jogo.equipePegouMorto[idEquipe] && temMortoDispAtualizado) entregarMorto(sala, idx);
                 else if (temCanastra(sala.jogo.jogosNaMesa[idEquipe])) encerrarPartida(sala, idEquipe);
             }
             
@@ -418,4 +455,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
