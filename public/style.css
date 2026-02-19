@@ -277,14 +277,21 @@ html, body {
 #hud-jogador {
     position: relative;
     width: 100%;
-    /* Empurra para o fim (Footer) */
-    margin-top: auto; 
+    margin-top: auto;
     padding: 15px 0;
     background: linear-gradient(to top, #000 40%, transparent);
     z-index: 60;
     display: flex;
     flex-direction: column;
     align-items: center;
+    
+    /* A CORREÇÃO MÁGICA: Permite clicar "através" da camada invisível do gradiente */
+    pointer-events: none; 
+}
+
+/* Garante que os botões e suas cartas continuem clicáveis! */
+#barra-acoes, #minha-mao {
+    pointer-events: auto; 
 }
 
 #barra-acoes {
@@ -387,5 +394,6 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
