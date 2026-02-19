@@ -104,6 +104,7 @@ function atualizarMesa(sala) {
     atualizarBotoesAcao(estado);
 }
 
+// --- ATUALIZAÇÃO VISUAL E ATRIBUIÇÃO DOS CLIQUES ---
 function atualizarMonte(sala) {
     const elMonte = document.getElementById('monte');
     const badge = document.getElementById('qtd-monte');
@@ -114,7 +115,7 @@ function atualizarMonte(sala) {
         elMonte.style.opacity = (qtd === 0) ? '0.3' : '1';
         elMonte.classList.remove('ativo-brilhando');
         
-        // Usa a função global blindada
+        // Atribui a função de rastreio blindada
         elMonte.onclick = window.acaoComprarMonte;
 
         if (turnoAtivo && sala.estadoTurno === 'comprando' && qtd > 0) {
@@ -141,7 +142,7 @@ function atualizarLixo(sala, estado) {
         divLixo.innerHTML = '<div style="color:rgba(255,255,255,0.2); font-size:12px;">LIXO</div>';
     }
     
-    // Usa a função global blindada
+    // Atribui a função de rastreio blindada
     areaLixo.onclick = window.acaoComprarLixo;
 }
 
@@ -301,18 +302,27 @@ function atualizarPlacarComIndicadores(sala) {
     if(elEles) elEles.innerHTML = ptsEles + (elesPegaramMorto ? icone : '');
 }
 
-window.acaoComprarMonte = function() {
-    console.log("👆 CLIQUE REGISTRADO: Comprar do Monte. Turno Ativo:", turnoAtivo);
+// --- FUNÇÕES DE RASTREIO DE CLIQUE ---
+window.acaoComprarMonte = function(event) {
+    if(event) event.stopPropagation(); // Impede que o clique se perca
+    console.log("👆 [RASTREIO] Clique no MONTE. Turno Ativo?", turnoAtivo, "| Estado:", ultimoEstadoSala?.estadoTurno);
+    
     if (!turnoAtivo || !ultimoEstadoSala) return;
+    
     if (ultimoEstadoSala.estadoTurno === 'comprando' && ultimoEstadoSala.jogo.monte.length > 0) {
+        console.log("📥 Enviando requisição de compra do monte para o servidor...");
         socket.emit('jogada', { acao: 'comprarMonte', dados: {} });
     }
 };
 
-window.acaoComprarLixo = function() {
-    console.log("👆 CLIQUE REGISTRADO: Interagir com o Lixo. Turno Ativo:", turnoAtivo);
+window.acaoComprarLixo = function(event) {
+    if(event) event.stopPropagation();
+    console.log("👆 [RASTREIO] Clique no LIXO. Turno Ativo?", turnoAtivo, "| Estado:", ultimoEstadoSala?.estadoTurno);
+    
     if (!turnoAtivo || !ultimoEstadoSala) return;
+    
     if (ultimoEstadoSala.estadoTurno === 'comprando' && ultimoEstadoSala.jogo.lixo.length > 0) {
+        console.log("📥 Enviando requisição de compra do lixo para o servidor...");
         socket.emit('jogada', { acao: 'comprarLixo', dados: {} });
     } else if (ultimoEstadoSala.estadoTurno === 'descartando') {
         acaoDescartar();
@@ -423,4 +433,5 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
 
