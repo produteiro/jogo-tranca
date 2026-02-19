@@ -65,17 +65,23 @@
                 <div class="logo">Jogo Tranca</div>
             </div>
             
-            <div class="header-center">
-                <div id="placar-integrado">
-                    <div class="time-score azul">
-                        <span class="label">NÓS</span>
-                        <span class="score" id="pts-nos">0</span>
+<div class="header-center">
+                <div class="area-placar-completa" style="display:flex; align-items:center; gap:20px;">
+                    <div id="tres-vermelhos-nos" class="tres-vermelhos-header"></div>
+                    
+                    <div id="placar-integrado">
+                        <div class="time-score azul">
+                            <span class="label">NÓS</span>
+                            <span class="score" id="pts-nos">0</span>
+                        </div>
+                        <div class="vs-divider">VS</div>
+                        <div class="time-score vermelha">
+                            <span class="score" id="pts-eles">0</span>
+                            <span class="label">ELES</span>
+                        </div>
                     </div>
-                    <div class="vs-divider">VS</div>
-                    <div class="time-score vermelha">
-                        <span class="score" id="pts-eles">0</span>
-                        <span class="label">ELES</span>
-                    </div>
+                    
+                    <div id="tres-vermelhos-eles" class="tres-vermelhos-header"></div>
                 </div>
                 <div id="info-jogo">Aguardando início...</div>
             </div>
@@ -221,6 +227,7 @@
     <script src="script.js"></script>
 </body>
 </html>
+
 
 
 
