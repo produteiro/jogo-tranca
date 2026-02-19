@@ -334,7 +334,7 @@ html, body {
     pointer-events: none; 
 }
 
-#barra-acoes, #minha-mao {
+#minha-mao {
     pointer-events: auto; /* Reativa o clique apenas nos botões e nas cartas */
 }
 /*
@@ -378,7 +378,7 @@ html, body {
 #minha-mao .carta.selecionada {
    /*transform: translateY(-25px);*/
     box-shadow: 0 0 0 3px #2ecc71, 0 10px 20px black;
-    z-index: 90;
+    //z-index: 90;
 }
 
 /* =========================================
@@ -433,6 +433,7 @@ html, body {
         margin-right: -35px;
     }
 }
+
 
 
 
