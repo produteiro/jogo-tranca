@@ -26,12 +26,21 @@ html, body {
     display: none;
     flex-direction: column;
     width: 100%;
-    height: 100%;
+    height: 100vh; /* Altura fixa da tela para permitir rolagem interna */
     position: relative;
-    overflow-y: auto; 
+    overflow-y: auto; /* A rolagem acontece aqui */
     overflow-x: hidden;
-    /* Garante espaçamento no fim da rolagem */
     padding-bottom: 20px;
+}
+
+/* A MÁGICA CONTRA A SOBREPOSIÇÃO: 
+   O flex-shrink: 0 impede que as áreas sejam esmagadas. 
+   Se não couber na tela, ele empurra para baixo e cria a rolagem! */
+#jogos-adversarios, 
+.faixa-central, 
+#meus-jogos, 
+#hud-jogador {
+    flex-shrink: 0; 
 }
 
 /* =========================================
@@ -101,20 +110,16 @@ html, body {
 /* Jogos dos Adversários (Abaixo do Topo) */
 #jogos-adversarios {
     position: relative;
-    /* Margem para não bater no parceiro */
-    margin-top: 110px; 
-    /* Margem inferior para empurrar a mesa central */
-    margin-bottom: 20px; 
-    
+    margin-top: 100px; /* Distância do topo */
     width: 100%;
     min-height: 120px;
     display: flex;
     justify-content: center;
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 30px;
+    gap: 25px;
     z-index: 10;
-    padding: 0 60px; /* Padding lateral para não bater nos bots laterais */
+    padding: 0 50px;
 }
 
 /* Laterais (Ficam flutuando no meio vertical da tela) */
@@ -155,19 +160,16 @@ html, body {
    5. MESA CENTRAL (MONTE/LIXO) - ÁREA CRÍTICA
    ========================================= */
 .faixa-central {
-    /* CORREÇÃO DE SOBREPOSIÇÃO: */
-    /* Margem grande para garantir distância dos jogos adversários */
-    margin-top: 40px; 
-    margin-bottom: 40px;
-    
+    margin-top: 50px; /* Distância dos adversários */
+    margin-bottom: 50px; /* Distância dos seus jogos */
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 80px; /* Espaço maior entre monte, lixo e mortos */
+    gap: 60px;
     position: relative;
-    z-index: 20; /* Fica ACIMA dos jogos adversários se der conflito */
+    z-index: 50; /* Z-index alto para o Lixo e Monte sempre serem clicáveis */
     min-height: 140px;
-    pointer-events: none; /* Deixa clicar através da área vazia */
+    pointer-events: auto;
 }
 
 /* Reabilita cliques nos elementos interativos */
@@ -239,7 +241,7 @@ html, body {
     flex-wrap: wrap;
     gap: 30px;
     padding: 10px 50px;
-    margin-bottom: 100px; /* <--- AUMENTADO: Evita que os jogos fiquem escondidos atrás da mão */
+    margin-bottom: 40px; /* Dá um respiro antes da sua mão começar */
     position: relative;
     z-index: 10;
 }
@@ -277,21 +279,20 @@ html, body {
 #hud-jogador {
     position: relative;
     width: 100%;
-    margin-top: auto;
-    padding: 15px 0;
-    background: linear-gradient(to top, #000 40%, transparent);
+    margin-top: auto; 
+    padding: 20px 0;
+    background: linear-gradient(to top, #000 60%, transparent);
     z-index: 60;
     display: flex;
     flex-direction: column;
     align-items: center;
     
-    /* A CORREÇÃO MÁGICA: Permite clicar "através" da camada invisível do gradiente */
+    /* Permite que o mouse atravesse as áreas vazias do gradiente e clique no Lixo/Monte */
     pointer-events: none; 
 }
 
-/* Garante que os botões e suas cartas continuem clicáveis! */
 #barra-acoes, #minha-mao {
-    pointer-events: auto; 
+    pointer-events: auto; /* Reativa o clique apenas nos botões e nas cartas */
 }
 
 #barra-acoes {
@@ -394,6 +395,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
