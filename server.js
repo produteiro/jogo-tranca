@@ -118,7 +118,7 @@ const iniciarNovaRodada = (sala) => {
 
 // --- AÇÕES DO JOGO ---
 const gameActions = {
-    comprarDoMonte: (sala, idx, socket) => {
+comprarDoMonte: (sala, idx, socket) => {
         if (sala.vez !== idx) {
             if(socket) socket.emit('erroJogo', 'Não é a sua vez de jogar!');
             return;
@@ -136,7 +136,12 @@ const gameActions = {
         }
     
         const cartaOriginal = sala.jogo.monte.pop();
-        if(!cartaOriginal) return; // Proteção
+        if(!cartaOriginal) return; 
+        
+        // ✅ CORREÇÃO: Puxa o morto para o monte IMEDIATAMENTE após pegar a última carta
+        if (sala.jogo.monte.length === 0) {
+            garantirMonteDisponivel(sala);
+        }
         
         sala.jogo[`maoJogador${idx + 1}`].push(cartaOriginal);
         higienizarMaoComTresVermelhos(sala, idx);
@@ -241,7 +246,7 @@ const gameActions = {
         }
     },
 
-    descartarCarta: (sala, idx, cartaIdOuIndex, socket) => {
+descartarCarta: (sala, idx, cartaIdOuIndex, socket) => {
         if (sala.vez !== idx) return;
         const mao = sala.jogo[`maoJogador${idx + 1}`];
         
@@ -290,6 +295,13 @@ const gameActions = {
                     return;
                 }
             }
+        }
+
+        // ✅ CORREÇÃO: Encerra o jogo no momento do descarte se o monte e os mortos esgotaram
+        if (sala.jogo.monte.length === 0 && sala.jogo.morto1.length === 0 && sala.jogo.morto2.length === 0) {
+            console.log(`[FIM DE JOGO] O monte esgotou na sala ${sala.id}`);
+            encerrarPartida(sala, -1); // -1 informa à função de placar que ninguém recebe os 100 pontos de batida
+            return;
         }
 
         // LIMPEZA COMPLETA: Sem re-compra, o turno passa invariavelmente.
@@ -406,3 +418,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
