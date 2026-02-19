@@ -13,13 +13,14 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
+    /* Identidade original mantida */
     background: radial-gradient(circle at center, #1a2a3a 0%, #000000 100%);
     font-family: 'Segoe UI', sans-serif;
     color: white;
 }
 
 /* =========================================
-   2. ESTRUTURA DA MESA
+   2. ESTRUTURA DA MESA (FLUXO VERTICAL)
    ========================================= */
 #mesa {
     display: none;
@@ -29,6 +30,8 @@ html, body {
     position: relative;
     overflow-y: auto; 
     overflow-x: hidden;
+    /* Garante espaçamento no fim da rolagem */
+    padding-bottom: 20px;
 }
 
 /* =========================================
@@ -83,6 +86,7 @@ html, body {
 /* =========================================
    4. ÁREAS DOS JOGADORES
    ========================================= */
+/* Topo (Parceiro) - Fixo visualmente no topo */
 #mao-topo {
     position: absolute;
     top: 80px;
@@ -94,24 +98,30 @@ html, body {
     pointer-events: none;
 }
 
+/* Jogos dos Adversários (Abaixo do Topo) */
 #jogos-adversarios {
     position: relative;
-    margin-top: 100px;
+    /* Margem para não bater no parceiro */
+    margin-top: 110px; 
+    /* Margem inferior para empurrar a mesa central */
+    margin-bottom: 20px; 
+    
     width: 100%;
     min-height: 120px;
     display: flex;
     justify-content: center;
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 25px;
+    gap: 30px;
     z-index: 10;
-    padding: 0 50px;
+    padding: 0 60px; /* Padding lateral para não bater nos bots laterais */
 }
 
+/* Laterais (Ficam flutuando no meio vertical da tela) */
 #mao-esquerda, #mao-direita {
     position: absolute;
     top: 50%; transform: translateY(-50%);
-    z-index: 20;
+    z-index: 50; /* Z-index alto para ficar acima de cartas da mesa */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -142,27 +152,33 @@ html, body {
 }
 
 /* =========================================
-   5. MESA CENTRAL (MONTE/LIXO)
+   5. MESA CENTRAL (MONTE/LIXO) - ÁREA CRÍTICA
    ========================================= */
 .faixa-central {
-    margin-top: 20px;
-    margin-bottom: 20px;
+    /* CORREÇÃO DE SOBREPOSIÇÃO: */
+    /* Margem grande para garantir distância dos jogos adversários */
+    margin-top: 40px; 
+    margin-bottom: 40px;
+    
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 60px;
+    gap: 80px; /* Espaço maior entre monte, lixo e mortos */
     position: relative;
-    z-index: 5;
+    z-index: 20; /* Fica ACIMA dos jogos adversários se der conflito */
     min-height: 140px;
+    pointer-events: none; /* Deixa clicar através da área vazia */
 }
+
+/* Reabilita cliques nos elementos interativos */
+.slot-mesa { pointer-events: auto; }
 
 .label-mesa {
     font-size: 10px; color: #888; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px;
+    text-align: center;
 }
 
-/* Container do Monte e Lixo */
 #monte, #lixo {
-    /* Tamanho PADRÃO igual ao da mão */
     width: 80px; height: 112px;
     border-radius: 6px;
     position: relative;
@@ -183,10 +199,12 @@ html, body {
     display: flex; justify-content: center; align-items: center;
 }
 
-/* Carta DENTRO do lixo (para não ficar gigante) */
+/* Garante tamanho padrão para a carta dentro do lixo */
 #carta-lixo .carta {
-    width: 80px; height: 112px; /* Força o tamanho padrão */
+    width: 80px; height: 112px; 
     border-radius: 6px;
+    position: relative; 
+    box-shadow: none; /* Remove sombra extra pois já está no container */
 }
 #carta-lixo img { width: 100%; height: 100%; border-radius: 6px; }
 
@@ -195,6 +213,7 @@ html, body {
     border-color: #f1c40f !important;
     transform: scale(1.05);
     z-index: 50;
+    cursor: pointer;
 }
 
 .contador-badge {
@@ -220,7 +239,9 @@ html, body {
     flex-wrap: wrap;
     gap: 30px;
     padding: 10px 50px;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 10;
 }
 
 .grupo-baixado {
@@ -234,10 +255,10 @@ html, body {
     border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* CARTAS NOS JOGOS - TAMANHO PADRONIZADO */
+/* Efeito Leque Horizontal */
 .grupo-baixado .carta {
-    width: 80px; height: 112px; /* Igual à mão */
-    margin-right: -50px; /* Sobreposição maior para compensar o tamanho */
+    width: 80px; height: 112px;
+    margin-right: -50px; 
     box-shadow: 2px 0 5px rgba(0,0,0,0.4);
     transition: margin 0.2s;
     background: white;
@@ -247,7 +268,7 @@ html, body {
 .grupo-baixado .carta:last-child { margin-right: 0; }
 
 .grupo-baixado:hover .carta {
-    margin-right: -30px; /* Abre ao passar o mouse */
+    margin-right: -30px;
 }
 
 /* =========================================
@@ -256,7 +277,8 @@ html, body {
 #hud-jogador {
     position: relative;
     width: 100%;
-    margin-top: auto;
+    /* Empurra para o fim (Footer) */
+    margin-top: auto; 
     padding: 15px 0;
     background: linear-gradient(to top, #000 40%, transparent);
     z-index: 60;
@@ -284,15 +306,14 @@ button:active { transform: translateY(2px); box-shadow: none; }
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 2px;
+    gap: 5px;
     width: 100%;
     max-width: 1200px;
     padding: 0 10px;
 }
 
-/* CARTAS NA MÃO - TAMANHO PADRONIZADO */
 #minha-mao .carta {
-    width: 80px; height: 112px; /* Padrão */
+    width: 80px; height: 112px;
     margin-right: -35px;
     box-shadow: -2px 0 6px rgba(0,0,0,0.5);
     transition: transform 0.2s, margin 0.2s;
@@ -315,7 +336,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
 }
 
 /* =========================================
-   8. MODAIS E UTILITÁRIOS
+   8. FERRAMENTAS E MODAIS
    ========================================= */
 #barra-ferramentas {
     position: fixed; bottom: 20px; right: 20px;
@@ -334,7 +355,6 @@ button:active { transform: translateY(2px); box-shadow: none; }
     pointer-events: none; white-space: nowrap;
 }
 
-/* Modal Fim de Jogo */
 #modal-fim {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.95); z-index: 5000;
@@ -355,12 +375,11 @@ button:active { transform: translateY(2px); box-shadow: none; }
 .item-valor { justify-content: center; }
 
 @media (max-width: 768px) {
-    .faixa-central { margin-top: 180px; gap: 20px; transform: scale(0.9); }
-    #mao-topo { top: 75px; }
-    #jogos-adversarios { margin-top: 90px; }
-    #meus-jogos { padding: 0 10px; gap: 15px; }
+    /* No mobile, aumenta o espaço para garantir que não haja sobreposição */
+    #jogos-adversarios { margin-top: 100px; padding: 0 10px; gap: 15px; }
+    .faixa-central { margin-top: 60px; gap: 20px; transform: scale(0.9); }
     
-    /* No mobile, reduzimos um pouco para caber */
+    /* Cartas menores para caber na tela do celular */
     .grupo-baixado .carta, #minha-mao .carta, #monte, #lixo, #carta-lixo .carta {
         width: 60px; height: 84px;
         margin-right: -35px;
