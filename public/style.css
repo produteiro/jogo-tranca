@@ -1,9 +1,10 @@
 /* =========================================
-   1. IDENTIDADE VISUAL TRANCAON (Cinza/Limpo)
+   1. RESET E IDENTIDADE VISUAL (PREMIUM DARK)
    ========================================= */
 * {
     box-sizing: border-box;
-    user-select: none; /* Evita selecionar texto ao clicar rápido */
+    touch-action: manipulation;
+    user-select: none;
 }
 
 html, body {
@@ -12,261 +13,289 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    /* Fundo Cinza Escuro Neutro (Estilo TrancaON) */
-    background-color: #2b2b2b; 
-    font-family: 'Arial', sans-serif;
+    /* Seu fundo original: Radial Dark */
+    background: radial-gradient(circle at center, #1a2a3a 0%, #000000 100%);
+    font-family: 'Segoe UI', sans-serif;
     color: white;
 }
 
 /* =========================================
-   2. LAYOUT EM FAIXAS (GRID VERTICAL)
+   2. ESTRUTURA DA MESA (ZONAS)
    ========================================= */
 #mesa {
     display: none;
     flex-direction: column;
-    height: 100%;
     width: 100%;
-    /* O segredo do layout fixo com áreas definidas */
-    justify-content: space-between; 
-    padding-bottom: 10px;
+    height: 100%;
+    position: relative;
+    /* Habilita rolagem apenas se necessário */
+    overflow-y: auto; 
+    overflow-x: hidden;
 }
 
 /* =========================================
-   3. CABEÇALHO E MÃO DO ADVERSÁRIO (TOPO)
+   3. CABEÇALHO (ESTILO ORIGINAL)
    ========================================= */
 #game-header {
-    height: 50px;
-    background: #1a1a1a;
+    position: relative;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.5); /* Translúcido */
+    border-bottom: 1px solid rgba(255, 215, 0, 0.2); /* Detalhe dourado sutil */
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 15px;
-    border-bottom: 1px solid #444;
+    padding: 0 20px;
+    flex-shrink: 0;
+}
+
+.logo {
+    color: #f1c40f;
+    font-weight: 900;
+    font-size: 22px;
+    text-shadow: 0 2px 5px black;
+    letter-spacing: 1px;
 }
 
 #placar-integrado {
     display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.6);
+    padding: 5px 20px;
+    border-radius: 20px;
+    border: 1px solid #444;
     gap: 20px;
-    font-size: 14px;
+}
+
+.time-score { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.time-score .label { font-size: 9px; color: #bbb; font-weight: bold; }
+.time-score .score { font-size: 20px; font-weight: bold; }
+.azul { color: #3498db; }
+.vermelha { color: #e74c3c; }
+.vs-divider { color: #666; font-size: 10px; }
+
+#info-jogo {
+    margin-top: 5px;
+    font-size: 11px;
+    color: #f1c40f;
+    text-transform: uppercase;
     font-weight: bold;
 }
-.time-score span { margin: 0 2px; }
-.azul { color: #4facfe; }
-.vermelha { color: #ff5252; }
 
-/* Área do Parceiro/Adversário Topo */
-#area-topo {
+/* =========================================
+   4. ÁREAS DOS JOGADORES (POSICIONAMENTO)
+   ========================================= */
+/* Topo (Parceiro) */
+#mao-topo {
+    position: absolute;
+    top: 80px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    z-index: 10;
     height: 80px;
+    pointer-events: none;
+}
+
+/* Jogos dos Adversários (Abaixo do Topo) */
+#jogos-adversarios {
+    position: relative; /* Mudança para fluir melhor */
+    margin-top: 100px; /* Empurra para baixo do header/parceiro */
+    width: 100%;
+    min-height: 120px;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    position: relative;
-    margin-top: 10px;
+    flex-wrap: wrap;
+    gap: 25px; /* Espaço entre sequências */
+    z-index: 10;
+    padding: 0 50px;
 }
 
-#mao-topo {
-    display: flex;
-    justify-content: center;
-}
-
-/* Miniaturas das cartas do topo */
-.carta-miniatura {
-    width: 35px; height: 50px;
-    background: url('https://deckofcardsapi.com/static/img/back.png');
-    background-size: cover;
-    border-radius: 3px;
-    margin-right: -25px; /* Empilhamento horizontal apertado */
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
-    border: 1px solid #ccc;
-}
-.carta-miniatura:last-child { margin-right: 0; }
-
-/* Jogadores Laterais (Apenas Info) */
+/* Laterais */
 #mao-esquerda, #mao-direita {
     position: absolute;
     top: 50%; transform: translateY(-50%);
-    width: 40px;
+    z-index: 20;
     display: flex;
     flex-direction: column;
     align-items: center;
-    z-index: 100;
 }
-#mao-esquerda { left: 5px; }
-#mao-direita { right: 5px; }
+#mao-esquerda { left: 10px; }
+#mao-direita { right: 10px; }
 
-.avatar-placeholder {
-    width: 40px; height: 40px;
-    background: #444; border-radius: 50%;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 10px; border: 2px solid #666;
-    color: #fff;
+.info-player {
+    background: #111;
+    color: #f1c40f;
+    border: 1px solid #f1c40f;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
     margin-bottom: 5px;
+    box-shadow: 0 2px 5px black;
+}
+
+.carta-miniatura {
+    width: 40px; height: 56px;
+    background: url('https://deckofcardsapi.com/static/img/back.png');
+    background-size: cover;
+    border-radius: 3px;
+    margin-bottom: -40px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+    border: 1px solid #333;
 }
 
 /* =========================================
-   4. JOGOS BAIXADOS (CORREÇÃO DO BUG)
-   ========================================= */
-/* Container que segura todos os jogos */
-.area-jogos-expostos {
-    flex: 1; /* Ocupa espaço disponível */
-    width: 100%;
-    display: flex;
-    justify-content: center; /* Centraliza os grupos na mesa */
-    align-items: center;
-    flex-wrap: wrap; /* Se tiver muitos jogos, quebra para linha de baixo */
-    gap: 30px; /* Espaço entre um jogo e outro (canastra e trinca) */
-    padding: 0 60px; /* Margem lateral para não bater nos players laterais */
-    min-height: 100px;
-}
-
-#jogos-adversarios { align-items: flex-start; margin-bottom: 10px; }
-#meus-jogos { align-items: flex-end; margin-top: 10px; }
-
-/* O GRUPO INDIVIDUAL (A Sequência ou Trinca) */
-.grupo-baixado {
-    display: flex;
-    flex-direction: row; /* GARANTE HORIZONTAL */
-    align-items: center;
-    background-color: rgba(0,0,0,0.2); /* Fundo sutil para identificar o grupo */
-    padding: 5px;
-    border-radius: 8px;
-    position: relative;
-    /* Sombras para destacar do fundo */
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
-}
-
-/* AS CARTAS DENTRO DO GRUPO */
-.grupo-baixado .carta {
-    width: 60px;  /* Tamanho menor para jogos na mesa */
-    height: 84px;
-    margin-right: -45px; /* O SEGREDO: Sobreposição Horizontal */
-    position: relative;
-    transition: margin 0.2s, transform 0.2s;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.2); /* Sombra lateral */
-}
-
-/* A última carta não tem margem negativa para fechar o grupo */
-.grupo-baixado .carta:last-child {
-    margin-right: 0;
-}
-
-/* Hover para ver a carta melhor */
-.grupo-baixado:hover .carta {
-    margin-right: -30px; /* Abre um pouco o leque ao passar o mouse */
-}
-
-/* =========================================
-   5. MESA CENTRAL (MONTE E LIXO)
+   5. MESA CENTRAL (MONTE/LIXO)
    ========================================= */
 .faixa-central {
-    height: 140px;
+    margin-top: 20px;
+    margin-bottom: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 60px; /* Espaço bom entre monte e lixo */
+    gap: 60px;
     position: relative;
-    background: rgba(255,255,255,0.03); /* Faixa sutil no meio */
-    width: 100%;
-}
-
-.slot-mesa {
-    position: relative;
-    display: flex; flex-direction: column; align-items: center;
+    z-index: 5;
+    min-height: 140px;
 }
 
 .label-mesa {
-    font-size: 10px; color: #aaa; text-transform: uppercase; margin-bottom: 5px;
+    font-size: 10px; color: #888; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px;
 }
 
-#monte, #lixo, .pilha-morto {
+#monte, #lixo {
     width: 80px; height: 112px;
-    border-radius: 5px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    position: relative;
     transition: transform 0.1s;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.6);
 }
 
 #monte {
     background: url('https://deckofcardsapi.com/static/img/back.png');
     background-size: cover;
     cursor: pointer;
+    border: 1px solid #444;
 }
-#monte:active { transform: scale(0.95); }
 
 #lixo {
     border: 2px dashed #555;
-    background: rgba(0,0,0,0.2);
+    background: rgba(255,255,255,0.05);
     display: flex; justify-content: center; align-items: center;
 }
 
-/* Badge de contagem (Bolinha azul) */
-.contador-badge {
-    position: absolute; bottom: -10px;
-    background: #3b82f6; color: white;
-    width: 24px; height: 24px; border-radius: 50%;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 12px; font-weight: bold; border: 2px solid #2b2b2b;
-    z-index: 20;
-}
-
-/* Mortos */
-#area-mortos {
-    position: relative; width: 100px; height: 100px;
-}
-.carta-morto {
-    width: 60px; position: absolute; left: 50%; top: 50%;
-    border-radius: 4px; box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-}
-
-/* =========================================
-   6. MÃO DO JOGADOR (HUD)
-   ========================================= */
-#hud-jogador {
-    background: linear-gradient(to top, #111 80%, transparent);
-    width: 100%;
-    padding: 10px 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+.ativo-brilhando {
+    box-shadow: 0 0 20px #f1c40f !important;
+    border-color: #f1c40f !important;
+    transform: scale(1.05);
     z-index: 50;
 }
 
+.contador-badge {
+    position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+    background: #3498db; color: white; padding: 2px 6px;
+    border-radius: 10px; font-size: 12px; font-weight: bold;
+    border: 2px solid #111;
+}
+
+#area-mortos {
+    position: relative; width: 100px; height: 100px;
+}
+
+/* =========================================
+   6. SEUS JOGOS NA MESA (A CORREÇÃO PRINCIPAL)
+   ========================================= */
+#meus-jogos {
+    width: 100%;
+    min-height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end; /* Alinha pela base */
+    flex-wrap: wrap;
+    gap: 30px; /* Espaço entre grupos */
+    padding: 10px 50px;
+    margin-bottom: 10px;
+}
+
+/* O GRUPO (Trinca/Sequência) */
+.grupo-baixado {
+    display: flex;
+    flex-direction: row; /* GARANTE HORIZONTAL */
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05); /* Fundo sutil */
+    padding: 5px 10px;
+    border-radius: 8px;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* AS CARTAS NO GRUPO */
+.grupo-baixado .carta {
+    width: 65px; height: 91px; /* Tamanho médio */
+    margin-right: -45px; /* O segredo do leque fechado */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.4);
+    transition: margin 0.2s;
+}
+.grupo-baixado .carta:last-child { margin-right: 0; }
+
+.grupo-baixado:hover .carta {
+    margin-right: -30px; /* Abre ao passar o mouse */
+}
+
+/* =========================================
+   7. HUD JOGADOR (SUA MÃO)
+   ========================================= */
+#hud-jogador {
+    position: relative;
+    width: 100%;
+    margin-top: auto; /* Empurra para o fundo da tela */
+    padding: 15px 0;
+    /* Gradiente preto estiloso */
+    background: linear-gradient(to top, #000 40%, transparent);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 #barra-acoes {
-    display: flex; gap: 10px; margin-bottom: 10px;
+    display: flex; gap: 15px; margin-bottom: 10px;
 }
 
 button {
-    padding: 8px 20px; border-radius: 4px; border: none;
+    padding: 10px 20px; border-radius: 5px; border: none;
     font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.4);
 }
-#btn-baixar-jogo { background: #27ae60; color: white; }
+button:active { transform: translateY(2px); box-shadow: none; }
+
+#btn-baixar-jogo { background: #3498db; color: white; }
 #btn-descartar { background: #c0392b; color: white; }
-#btn-limpar-selecao { background: #7f8c8d; color: white; }
+#btn-limpar-selecao { background: #95a5a6; color: white; }
 
 #minha-mao {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: wrap; /* Permite quebrar linha se necessário */
     justify-content: center;
-    gap: 2px; /* Cartas próximas */
+    gap: 2px;
     width: 100%;
+    max-width: 1200px;
     padding: 0 10px;
 }
 
-/* Estilo Base das Cartas (Mão e Mesa) */
-.carta {
-    background-color: white;
-    border-radius: 5px;
-    overflow: hidden;
-}
-.carta img { width: 100%; height: 100%; display: block; }
-
-/* Cartas NA MÃO (Maiores) */
+/* Cartas na Mão (Maiores) */
 #minha-mao .carta {
-    width: 85px; height: 119px;
-    cursor: pointer;
-    box-shadow: -2px 0 5px rgba(0,0,0,0.3); /* Sombra lateral para efeito leque */
+    width: 80px; height: 112px;
+    margin-right: -30px; /* Sobreposição elegante na mão */
+    box-shadow: -2px 0 6px rgba(0,0,0,0.5);
     transition: transform 0.2s, margin 0.2s;
-    margin-right: -40px; /* Sobreposição na mão */
+    cursor: pointer;
+    border-radius: 6px;
+    background: white;
 }
+#minha-mao .carta img { width: 100%; height: 100%; border-radius: 6px; display: block; }
 #minha-mao .carta:last-child { margin-right: 0; }
 
 #minha-mao .carta:hover {
@@ -275,18 +304,56 @@ button {
     margin-right: 0; /* Abre espaço */
 }
 #minha-mao .carta.selecionada {
-    transform: translateY(-30px);
-    box-shadow: 0 0 0 3px #f1c40f; /* Borda Dourada */
+    transform: translateY(-25px);
+    box-shadow: 0 0 0 3px #2ecc71, 0 10px 20px black;
     z-index: 90;
 }
 
 /* =========================================
-   7. MODAIS E UTILS
+   8. MODAIS E UTILITÁRIOS
    ========================================= */
+#barra-ferramentas {
+    position: fixed; bottom: 20px; right: 20px;
+    display: flex; flex-direction: column; gap: 10px; z-index: 200;
+}
+.btn-icone {
+    width: 50px; height: 50px; background: #222; border: 2px solid #444;
+    border-radius: 50%; display: flex; justify-content: center; align-items: center;
+    font-size: 20px; cursor: pointer; color: #f1c40f;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.watermark {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 30px; font-weight: 900; color: rgba(255,255,255,0.03);
+    pointer-events: none; white-space: nowrap;
+}
+
+/* Modal Fim de Jogo */
 #modal-fim {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.9); z-index: 9000;
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-    overflow-y: auto; padding: 20px;
+    background: rgba(0,0,0,0.95); z-index: 5000;
+    display: flex; flex-direction: column; align-items: center;
+    overflow-y: auto; padding: 40px 20px;
 }
-/* ... (Manter estilos da tabela do modal anterior que já estava responsiva) ... */
+.tabela-extrato {
+    background: #111; border: 1px solid #444; border-radius: 10px;
+    width: 100%; max-width: 600px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1.5fr 1fr 1fr;
+}
+.item-label, .item-valor {
+    padding: 10px; border-bottom: 1px solid #333; font-size: 13px; color: #ccc;
+    display: flex; align-items: center;
+}
+.item-label.header { color: #f1c40f; font-weight: bold; background: #222; }
+.item-valor.header { color: #f1c40f; font-weight: bold; background: #222; justify-content: center; }
+.item-valor { justify-content: center; }
+
+/* Responsividade Básica */
+@media (max-width: 768px) {
+    .faixa-central { margin-top: 180px; gap: 20px; transform: scale(0.9); }
+    #mao-topo { top: 75px; }
+    #jogos-adversarios { margin-top: 90px; }
+    #meus-jogos { padding: 0 10px; gap: 15px; }
+    .grupo-baixado .carta { margin-right: -40px; }
+}
