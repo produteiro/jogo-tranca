@@ -13,14 +13,13 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    /* Seu fundo original: Radial Dark */
     background: radial-gradient(circle at center, #1a2a3a 0%, #000000 100%);
     font-family: 'Segoe UI', sans-serif;
     color: white;
 }
 
 /* =========================================
-   2. ESTRUTURA DA MESA (ZONAS)
+   2. ESTRUTURA DA MESA
    ========================================= */
 #mesa {
     display: none;
@@ -28,19 +27,18 @@ html, body {
     width: 100%;
     height: 100%;
     position: relative;
-    /* Habilita rolagem apenas se necessário */
     overflow-y: auto; 
     overflow-x: hidden;
 }
 
 /* =========================================
-   3. CABEÇALHO (ESTILO ORIGINAL)
+   3. CABEÇALHO
    ========================================= */
 #game-header {
     position: relative;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.5); /* Translúcido */
-    border-bottom: 1px solid rgba(255, 215, 0, 0.2); /* Detalhe dourado sutil */
+    background: rgba(0, 0, 0, 0.5);
+    border-bottom: 1px solid rgba(255, 215, 0, 0.2);
     height: 70px;
     display: flex;
     align-items: center;
@@ -83,9 +81,8 @@ html, body {
 }
 
 /* =========================================
-   4. ÁREAS DOS JOGADORES (POSICIONAMENTO)
+   4. ÁREAS DOS JOGADORES
    ========================================= */
-/* Topo (Parceiro) */
 #mao-topo {
     position: absolute;
     top: 80px;
@@ -97,22 +94,20 @@ html, body {
     pointer-events: none;
 }
 
-/* Jogos dos Adversários (Abaixo do Topo) */
 #jogos-adversarios {
-    position: relative; /* Mudança para fluir melhor */
-    margin-top: 100px; /* Empurra para baixo do header/parceiro */
+    position: relative;
+    margin-top: 100px;
     width: 100%;
     min-height: 120px;
     display: flex;
     justify-content: center;
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 25px; /* Espaço entre sequências */
+    gap: 25px;
     z-index: 10;
     padding: 0 50px;
 }
 
-/* Laterais */
 #mao-esquerda, #mao-direita {
     position: absolute;
     top: 50%; transform: translateY(-50%);
@@ -165,7 +160,9 @@ html, body {
     font-size: 10px; color: #888; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px;
 }
 
+/* Container do Monte e Lixo */
 #monte, #lixo {
+    /* Tamanho PADRÃO igual ao da mão */
     width: 80px; height: 112px;
     border-radius: 6px;
     position: relative;
@@ -186,6 +183,13 @@ html, body {
     display: flex; justify-content: center; align-items: center;
 }
 
+/* Carta DENTRO do lixo (para não ficar gigante) */
+#carta-lixo .carta {
+    width: 80px; height: 112px; /* Força o tamanho padrão */
+    border-radius: 6px;
+}
+#carta-lixo img { width: 100%; height: 100%; border-radius: 6px; }
+
 .ativo-brilhando {
     box-shadow: 0 0 20px #f1c40f !important;
     border-color: #f1c40f !important;
@@ -205,39 +209,41 @@ html, body {
 }
 
 /* =========================================
-   6. SEUS JOGOS NA MESA (A CORREÇÃO PRINCIPAL)
+   6. SEUS JOGOS NA MESA
    ========================================= */
 #meus-jogos {
     width: 100%;
     min-height: 120px;
     display: flex;
     justify-content: center;
-    align-items: flex-end; /* Alinha pela base */
+    align-items: flex-end;
     flex-wrap: wrap;
-    gap: 30px; /* Espaço entre grupos */
+    gap: 30px;
     padding: 10px 50px;
     margin-bottom: 10px;
 }
 
-/* O GRUPO (Trinca/Sequência) */
 .grupo-baixado {
     display: flex;
-    flex-direction: row; /* GARANTE HORIZONTAL */
+    flex-direction: row; 
     align-items: center;
-    background: rgba(255, 255, 255, 0.05); /* Fundo sutil */
+    background: rgba(255, 255, 255, 0.05);
     padding: 5px 10px;
     border-radius: 8px;
     position: relative;
     border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* AS CARTAS NO GRUPO */
+/* CARTAS NOS JOGOS - TAMANHO PADRONIZADO */
 .grupo-baixado .carta {
-    width: 65px; height: 91px; /* Tamanho médio */
-    margin-right: -45px; /* O segredo do leque fechado */
+    width: 80px; height: 112px; /* Igual à mão */
+    margin-right: -50px; /* Sobreposição maior para compensar o tamanho */
     box-shadow: 2px 0 5px rgba(0,0,0,0.4);
     transition: margin 0.2s;
+    background: white;
+    border-radius: 6px;
 }
+.grupo-baixado .carta img { width: 100%; height: 100%; border-radius: 6px; }
 .grupo-baixado .carta:last-child { margin-right: 0; }
 
 .grupo-baixado:hover .carta {
@@ -250,9 +256,8 @@ html, body {
 #hud-jogador {
     position: relative;
     width: 100%;
-    margin-top: auto; /* Empurra para o fundo da tela */
+    margin-top: auto;
     padding: 15px 0;
-    /* Gradiente preto estiloso */
     background: linear-gradient(to top, #000 40%, transparent);
     z-index: 60;
     display: flex;
@@ -277,7 +282,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
 
 #minha-mao {
     display: flex;
-    flex-wrap: wrap; /* Permite quebrar linha se necessário */
+    flex-wrap: wrap;
     justify-content: center;
     gap: 2px;
     width: 100%;
@@ -285,10 +290,10 @@ button:active { transform: translateY(2px); box-shadow: none; }
     padding: 0 10px;
 }
 
-/* Cartas na Mão (Maiores) */
+/* CARTAS NA MÃO - TAMANHO PADRONIZADO */
 #minha-mao .carta {
-    width: 80px; height: 112px;
-    margin-right: -30px; /* Sobreposição elegante na mão */
+    width: 80px; height: 112px; /* Padrão */
+    margin-right: -35px;
     box-shadow: -2px 0 6px rgba(0,0,0,0.5);
     transition: transform 0.2s, margin 0.2s;
     cursor: pointer;
@@ -301,7 +306,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
 #minha-mao .carta:hover {
     transform: translateY(-20px);
     z-index: 100;
-    margin-right: 0; /* Abre espaço */
+    margin-right: 0;
 }
 #minha-mao .carta.selecionada {
     transform: translateY(-25px);
@@ -349,11 +354,15 @@ button:active { transform: translateY(2px); box-shadow: none; }
 .item-valor.header { color: #f1c40f; font-weight: bold; background: #222; justify-content: center; }
 .item-valor { justify-content: center; }
 
-/* Responsividade Básica */
 @media (max-width: 768px) {
     .faixa-central { margin-top: 180px; gap: 20px; transform: scale(0.9); }
     #mao-topo { top: 75px; }
     #jogos-adversarios { margin-top: 90px; }
     #meus-jogos { padding: 0 10px; gap: 15px; }
-    .grupo-baixado .carta { margin-right: -40px; }
+    
+    /* No mobile, reduzimos um pouco para caber */
+    .grupo-baixado .carta, #minha-mao .carta, #monte, #lixo, #carta-lixo .carta {
+        width: 60px; height: 84px;
+        margin-right: -35px;
+    }
 }
