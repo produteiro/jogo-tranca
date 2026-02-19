@@ -77,6 +77,42 @@ html, body {
     gap: 20px;
 }
 
+/* --- 3 VERMELHOS NO CABEÇALHO --- */
+.tres-vermelhos-header {
+    display: flex;
+    align-items: center;
+    min-width: 45px; /* Mantém o espaço reservado mesmo vazio */
+    min-height: 45px;
+}
+
+.carta-mini-header {
+    width: 32px;
+    height: 45px;
+    margin-right: -20px; /* Sobreposição horizontal acentuada */
+    border-radius: 3px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+    border: 1px solid rgba(255,255,255,0.2);
+    background: white;
+    transition: margin 0.2s;
+    position: relative;
+}
+
+.carta-mini-header:last-child { 
+    margin-right: 0; 
+}
+
+.carta-mini-header:hover { 
+    margin-right: -10px; /* Abre um pouco ao passar o mouse */
+    z-index: 10; 
+}
+
+.carta-mini-header img { 
+    width: 100%; 
+    height: 100%; 
+    display: block; 
+    border-radius: 3px; 
+}
+
 .time-score { display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .time-score .label { font-size: 9px; color: #bbb; font-weight: bold; }
 .time-score .score { font-size: 20px; font-weight: bold; }
@@ -395,6 +431,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
