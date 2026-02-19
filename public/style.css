@@ -376,7 +376,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
 #minha-mao .carta:last-child { margin-right: 0; }
 
 #minha-mao .carta.selecionada {
-    transform: translateY(-25px);
+    //transform: translateY(-25px);
     box-shadow: 0 0 0 3px #2ecc71, 0 10px 20px black;
     z-index: 90;
 }
@@ -433,6 +433,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
