@@ -342,16 +342,16 @@ html, body {
     display: flex; gap: 15px; margin-bottom: 10px;
 }
 
-button {
-    padding: 10px 20px; border-radius: 5px; border: none;
-    font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px;
-    box-shadow: 0 4px 0 rgba(0,0,0,0.4);
-}
-button:active { transform: translateY(2px); box-shadow: none; }
+//button {
+//    padding: 10px 20px; border-radius: 5px; border: none;
+//    font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 12px;
+//    box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+//}
+//button:active { transform: translateY(2px); box-shadow: none; }
 
-#btn-baixar-jogo { background: #3498db; color: white; }
-#btn-descartar { background: #c0392b; color: white; }
-#btn-limpar-selecao { background: #95a5a6; color: white; }
+//#btn-baixar-jogo { background: #3498db; color: white; }
+//#btn-descartar { background: #c0392b; color: white; }
+//#btn-limpar-selecao { background: #95a5a6; color: white; }
 
 #minha-mao {
     display: flex;
@@ -433,6 +433,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
