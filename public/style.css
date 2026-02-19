@@ -294,20 +294,30 @@ html, body {
 }
 
 /* Efeito Leque Horizontal */
+/* AS CARTAS NOS JOGOS - SOBREPOSIÇÃO OTIMIZADA */
 .grupo-baixado .carta {
-    width: 80px; height: 112px;
-    margin-right: -50px; 
-    box-shadow: 2px 0 5px rgba(0,0,0,0.4);
-    transition: margin 0.2s;
+    width: 80px; 
+    height: 112px; 
+    /* A MÁGICA DO ESPAÇO: Aumentamos o valor negativo para esconder mais a carta.
+       Como a carta tem 80px, -60px deixa exatamente 20px visíveis (só o número e naipe) */
+    margin-right: -60px; 
+    
+    box-shadow: -2px 0 5px rgba(0,0,0,0.5); /* Sombra para a esquerda ajuda a destacar o corte */
+    transition: margin 0.2s ease-in-out;
     background: white;
     border-radius: 6px;
 }
-.grupo-baixado .carta img { width: 100%; height: 100%; border-radius: 6px; }
-.grupo-baixado .carta:last-child { margin-right: 0; }
 
-.grupo-baixado:hover .carta {
-    margin-right: -30px;
+.grupo-baixado .carta img { 
+    width: 100%; 
+    height: 100%; 
+    border-radius: 6px; 
 }
+
+.grupo-baixado .carta:last-child { 
+    margin-right: 0; /* A última carta do jogo fica 100% visível */
+}
+
 
 /* =========================================
    7. HUD JOGADOR (SUA MÃO)
@@ -431,6 +441,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
