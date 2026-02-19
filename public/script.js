@@ -19,16 +19,22 @@ socket.on('erroJogo', (msg) => {
     alert("❌ AÇÃO INVÁLIDA:\n\n" + msg);
 });
 
-// --- LOGIN ---
-window.onload = function() {
+
+// --- RECONEXÃO AUTOMÁTICA E LOGIN ---
+// Ouve toda vez que o socket conecta (seja na primeira vez ou após uma queda de rede)
+socket.on('connect', () => {
+    console.log("🔌 Conectado/Reconectado ao servidor!");
     const sessao = localStorage.getItem('tranca_sessao');
     if (sessao) {
         try {
             const user = JSON.parse(sessao);
-            if(user && user.nome) socket.emit('loginAnonimo', user.nome);
+            if(user && user.nome) {
+                // Refaz o login e o servidor vai te puxar de volta pra mesa ativa!
+                socket.emit('loginAnonimo', { nome: user.nome, uid: meuUid });
+            }
         } catch(e) { console.error(e); }
     }
-};
+});
 
 function jogarAnonimo() {
     const nome = 'Visitante-' + Math.floor(Math.random()*1000);
@@ -440,6 +446,7 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
 
 
 
