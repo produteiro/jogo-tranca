@@ -355,10 +355,12 @@ button:active { transform: translateY(2px); box-shadow: none; }
     pointer-events: none; white-space: nowrap;
 }
 
+/* Modal Fim de Jogo */
 #modal-fim {
+    display: none; /* A CORREÇÃO ESTÁ AQUI: Deve iniciar oculto */
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.95); z-index: 5000;
-    display: flex; flex-direction: column; align-items: center;
+    flex-direction: column; align-items: center;
     overflow-y: auto; padding: 40px 20px;
 }
 .tabela-extrato {
@@ -385,3 +387,4 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
