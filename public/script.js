@@ -398,15 +398,6 @@ window.acaoLimpar = function() { cartasSelecionadas = []; renderizarMinhaMao(ult
 window.acaoOrdenar = function() { socket.emit('jogada', { acao: 'ordenar', dados: {} }); };
 window.pedirReset = function() { if(confirm('Reiniciar?')) socket.emit('resetJogo'); };
 window.fazerLogout = function() { localStorage.removeItem('tranca_sessao'); location.reload(); };
-window.jogarAnonimo = jogarAnonimo;
-window.fazerLogin = fazerLogin;
-window.entrarModoTreino = entrarModoTreino;
-
-window.tentarBaixarJogo = window.acaoBaixar;
-window.descartarCartaSelecionadas = window.acaoDescartar;
-window.limparSelecao = window.acaoLimpar;
-window.alternarOrdenacao = window.acaoOrdenar;
-
 window.toggleChat = function() {
     const chat = document.getElementById('janela-chat');
     chat.style.display = (chat.style.display === 'none') ? 'flex' : 'none';
@@ -505,3 +496,4 @@ document.addEventListener('keypress', function(e) {
         }
     }
 });
+
