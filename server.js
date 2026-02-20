@@ -365,11 +365,110 @@ function entregarMorto(sala, idx) {
     broadcastEstado(sala);
 }
 
+// --- FUNÇÃO DE ENCERRAMENTO E CÁLCULO BLINDADA ---
+
+function calcularPontuacaoSegura(sala, idEquipeBateu) {
+    const res = {
+        detalhes: {
+            p1: { ptsBatida: 0, ptsMorto: 0, ptsCanastrasLimpas: 0, ptsCanastrasSujas: 0, pts3Vermelhos: 0, ptsCartasMao: 0, ptsCartasMesa: 0, total: 0 },
+            p2: { ptsBatida: 0, ptsMorto: 0, ptsCanastrasLimpas: 0, ptsCanastrasSujas: 0, pts3Vermelhos: 0, ptsCartasMao: 0, ptsCartasMesa: 0, total: 0 }
+        },
+        placar: { p1: 0, p2: 0 }
+    };
+
+    const equipes = [0, 1]; // Equipe 0 (P1/P3) e Equipe 1 (P2/P4)
+
+    equipes.forEach(idEq => {
+        const chave = idEq === 0 ? 'p1' : 'p2';
+        const d = res.detalhes[chave];
+        
+        // 1. Pontos de Batida (Só aplica se alguém bateu E foi essa equipe)
+        if (idEquipeBateu !== -1 && idEquipeBateu === idEq) {
+            d.ptsBatida = 100;
+        }
+
+        // 2. Pontos de Morto (Se pegou é 0, se não pegou paga -100)
+        // OBS: Se o morto acabou e ninguém pegou, quem não pegou paga -100 igual.
+        if (!sala.jogo.equipePegouMorto[idEq]) {
+            d.ptsMorto = -100;
+        }
+
+        // 3. Canastras e Cartas na Mesa
+        sala.jogo.jogosNaMesa[idEq].forEach(jogo => {
+            // Canastras
+            if (jogo.length >= 7) {
+                const temCuringa = jogo.some(c => c.face === '2'); // Simplificado
+                const ehLimpa = !temCuringa; 
+                if (ehLimpa) d.ptsCanastrasLimpas += 200;
+                else d.ptsCanastrasSujas += 100;
+            }
+            
+            // Soma valor das cartas na mesa
+            jogo.forEach(c => {
+                d.ptsCartasMesa += getValorCarta(c);
+            });
+        });
+
+        // 4. 3 Vermelhos
+        sala.jogo.tresVermelhos[idEq].forEach(c => {
+            d.pts3Vermelhos += 100; // Ou o valor que você usa na sua regra
+        });
+
+        // 5. Desconto das Cartas na Mão (Sobra)
+        // Jogadores da equipe: 0 e 2 para Eq0, 1 e 3 para Eq1
+        const idxJogadores = idEq === 0 ? [0, 2] : [1, 3];
+        idxJogadores.forEach(idx => {
+            // Se foi o jogador que bateu, a mão está vazia (0 pontos), então não desconta
+            const mao = sala.jogo[`maoJogador${idx+1}`];
+            if (mao) {
+                mao.forEach(c => {
+                    d.ptsCartasMao -= getValorCarta(c);
+                });
+            }
+        });
+
+        // Total da Rodada
+        d.total = d.ptsBatida + d.ptsMorto + d.ptsCanastrasLimpas + d.ptsCanastrasSujas + d.pts3Vermelhos + d.ptsCartasMesa + d.ptsCartasMao;
+    });
+
+    // Atualiza Placar Geral (Acumulado)
+    // Se não tiver placar anterior, assume 0
+    const placarAntigo = sala.placarGlobal || { p1: 0, p2: 0 };
+    res.placar.p1 = placarAntigo.p1 + res.detalhes.p1.total;
+    res.placar.p2 = placarAntigo.p2 + res.detalhes.p2.total;
+    
+    // Salva na sala para a próxima rodada (opcional, se for manter a sala)
+    sala.placarGlobal = res.placar;
+
+    return res;
+}
+
+function getValorCarta(c) {
+    if (!c) return 0;
+    if (c.face === '3' && (c.naipe === 'copas' || c.naipe === 'ouros' || c.naipe === 'HEARTS' || c.naipe === 'DIAMONDS')) return 0; // 3 Vermelho na mão/mesa não vale ponto normal, vale bonus
+    if (c.face === '2') return 10; // Curinga vale 10 (ou 20 dependendo da regra, aqui pus 10 padrão mesa)
+    if (c.face === 'J' || c.face === 'Q' || c.face === 'K' || c.face === '10' || c.face === '8' || c.face === '9') return 10;
+    if (c.face === 'A') return 15;
+    return 5; // 3 a 7
+}
+
 function encerrarPartida(sala, idEquipeBateu) {
-    const res = calcularResultadoFinal(sala, idEquipeBateu);
-    io.to(sala.id).emit('fimDeJogo', res);
-    sala.jogo = null;
-    sala.vez = 0;
+    console.log(`[FIM] Encerrando partida na sala ${sala.id}. Batida: ${idEquipeBateu}`);
+    
+    try {
+        const resultado = calcularPontuacaoSegura(sala, idEquipeBateu);
+        io.to(sala.id).emit('fimDeJogo', resultado);
+        console.log("Resultado enviado com sucesso.");
+        
+        // Limpa o jogo da memória para evitar travamentos, mas mantém a sala e jogadores
+        sala.jogo = null;
+        sala.vez = 0;
+    } catch (e) {
+        console.error("ERRO FATAL AO CALCULAR PONTOS:", e);
+        // Em último caso, destrava o cliente
+        io.to(sala.id).emit('erroJogo', 'Fim de jogo (Erro no cálculo de pontos). Reiniciando...');
+        sala.jogo = null;
+    }
 }
 
 function verificarVezBot(sala) {
@@ -380,6 +479,28 @@ function verificarVezBot(sala) {
             if(sala.jogo) jogarTurnoBot(sala, sala.vez, gameActions);
         }, 1000);
     }
+}
+
+function registrarLog(sala, acao, idJogador, dadosPayload) {
+    if (!sala) return;
+    
+    const timestamp = new Date().toISOString(); // Ex: 2026-02-19T20:45:00.000Z
+    const estadoTurno = sala.estadoTurno || 'indefinido';
+    const vezAtual = sala.vez;
+    
+    const entradaLog = {
+        hora: timestamp,
+        jogadorIdx: idJogador,
+        vezEraDo: vezAtual,
+        faseTurno: estadoTurno,
+        comando: acao,
+        payload: dadosPayload
+    };
+    
+    sala.logAcoes.push(entradaLog);
+    
+    // Opcional: Imprime no console do servidor em tempo real para você monitorar
+    console.log(`[LOG ${sala.id}] J${idJogador} -> ${acao}`, dadosPayload);
 }
 
 io.on('connection', (socket) => {
@@ -401,14 +522,15 @@ io.on('connection', (socket) => {
         // Se a sala não existe, cria (Zera tudo)
         if (!salas[idSala]) {
             console.log(`[SALA] Criando nova estrutura para sala: ${idSala}`);
-            salas[idSala] = { 
-                id: idSala, 
-                jogadores: [null,null,null,null], 
-                donos: [null,null,null,null], 
-                usuarios: [null,null,null,null], 
-                jogo: null, 
-                vez: 0 
-            };
+salas[idSala] = { 
+    id: idSala, 
+    jogadores: [null,null,null,null], 
+    donos: [null,null,null,null], 
+    usuarios: [null,null,null,null], 
+    jogo: null, 
+    vez: 0,
+    logAcoes: [] // A NOSSA CAIXA PRETA
+};
         }
         
         const s = salas[idSala];
@@ -506,6 +628,7 @@ socket.on('jogada', (dados) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
