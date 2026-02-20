@@ -388,33 +388,71 @@ io.on('connection', (socket) => {
         socket.emit('loginSucesso', socket.usuarioLogado);
     });
 
+// --- LÓGICA DE SALA COM RECONEXÃO BLINDADA ---
     socket.on('entrarSala', idSolicitado => {
-        const idSala = (idSolicitado === 'treino') ? `treino-${socket.id}` : idSolicitado;
+        if (!socket.usuarioLogado) return; 
+
+        const uid = socket.usuarioLogado.id;
+        const idSala = (idSolicitado === 'treino') ? `treino-${uid}` : idSolicitado;
+        
         socket.join(idSala); 
         socket.salaAtual = idSala;
         
+        // Se a sala não existe, cria (Zera tudo)
         if (!salas[idSala]) {
-            salas[idSala] = { id: idSala, jogadores: [null,null,null,null], donos: [null,null,null,null], usuarios: [null,null,null,null], jogo: null, vez: 0 };
+            console.log(`[SALA] Criando nova estrutura para sala: ${idSala}`);
+            salas[idSala] = { 
+                id: idSala, 
+                jogadores: [null,null,null,null], 
+                donos: [null,null,null,null], 
+                usuarios: [null,null,null,null], 
+                jogo: null, 
+                vez: 0 
+            };
         }
         
         const s = salas[idSala];
-        let slot = s.donos.indexOf(null);
-        if (s.donos.includes(socket.id)) slot = s.donos.indexOf(socket.id);
         
-        if(slot !== -1) { 
-            s.donos[slot] = socket.id; 
+        // 1. Tenta achar o usuário pelo UID Persistente (Recuperação de Cadeira)
+        let slot = s.usuarios.findIndex(u => u && u.id === uid);
+        
+        if (slot !== -1) {
+            console.log(`[RECONEXÃO] O jogador ${socket.usuarioLogado.nome} (Slot ${slot}) voltou! Atualizando socket...`);
+            // Atualiza apenas o socket da conexão atual, mantendo o resto intacto
+            s.donos[slot] = socket.id;
             s.jogadores[slot] = socket.id;
-            s.usuarios[slot] = socket.usuarioLogado;
+        } else {
+            // Jogador Novo na sala
+            slot = s.donos.indexOf(null);
+            if(slot !== -1) { 
+                console.log(`[ENTRADA] Novo jogador ${socket.usuarioLogado.nome} ocupou o Slot ${slot}`);
+                s.donos[slot] = socket.id; 
+                s.jogadores[slot] = socket.id;
+                s.usuarios[slot] = socket.usuarioLogado;
+            }
         }
         
+        // 2. Preenche Bots apenas nos buracos vazios (sem sobrescrever ninguém)
         if(idSala.startsWith('treino-')) { 
-            for(let i=0; i<4; i++) if(!s.donos[i]) { s.donos[i] = `BOT-${i}`; s.jogadores[i] = `BOT-${i}`; }
+            for(let i=0; i<4; i++) {
+                // Só coloca bot se NÃO tiver usuário registrado ali
+                if(!s.usuarios[i]) { 
+                    s.donos[i] = `BOT-${i}`; 
+                    s.jogadores[i] = `BOT-${i}`; 
+                    s.usuarios[i] = { id: `BOT-${i}`, nome: `Bot ${i+1}` }; 
+                }
+            }
         }
         
-        if(s.donos.every(d => d !== null) && !s.jogo) {
-            iniciarNovaRodada(s);
-        } else if (s.jogo) {
+        // 3. DECISÃO CRÍTICA: Recuperar ou Iniciar?
+        if (s.jogo) {
+            // SE O JOGO JÁ EXISTE, NÃO INICIE OUTRO! APENAS ENVIE O ESTADO.
+            console.log(`[ESTADO] Enviando mesa atual para ${socket.usuarioLogado.nome} (Sem reiniciar)`);
             socket.emit('estadoJogo', s);
+        } else if (s.usuarios.every(u => u !== null)) {
+            // Só inicia novo jogo se a sala estiver cheia E o jogo for nulo
+            console.log(`[NOVO JOGO] Sala cheia e sem jogo ativo. Iniciando partida...`);
+            iniciarNovaRodada(s);
         }
     });
 
@@ -468,6 +506,7 @@ socket.on('jogada', (dados) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
