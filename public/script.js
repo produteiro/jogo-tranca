@@ -104,9 +104,26 @@ function atualizarMesa(sala) {
 
     const idEq = meuIndex % 2;
     renderizarJogos('meus-jogos', sala.jogo.jogosNaMesa[idEq], true);
+    renderizarJogos('meus-jogos', sala.jogo.jogosNaMesa[idEq], true);
     renderizarJogos('jogos-adversarios', sala.jogo.jogosNaMesa[(idEq + 1) % 2], false);
     
-    renderizarTresVermelhos(sala);
+    // --- NOVO: CLIQUE NA ÁREA VAZIA PARA BAIXAR NOVO JOGO ---
+    const divMeusJogos = document.getElementById('meus-jogos');
+    if (divMeusJogos) {
+        divMeusJogos.style.cursor = (turnoAtivo && estado === 'descartando' && cartasSelecionadas.length >= 3) ? 'pointer' : 'default';
+        
+        divMeusJogos.onclick = (e) => {
+            // Garante que o clique foi na área vazia e não em um jogo que já existe (que tem seu próprio onclick)
+            if (e.target === divMeusJogos || e.target.classList.contains('watermark')) {
+                if (turnoAtivo && estado === 'descartando' && cartasSelecionadas.length >= 3) {
+                    acaoBaixar();
+                }
+            }
+        };
+    }
+    // ---------------------------------------------------------
+
+    renderizarTresVermelhos(sala);    
 }
 
 // --- ATUALIZAÇÃO VISUAL E ATRIBUIÇÃO DOS CLIQUES ---
@@ -422,6 +439,7 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
 
 
 
