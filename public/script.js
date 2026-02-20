@@ -470,9 +470,38 @@ window.jogarNovamente = function() {
     socket.emit('resetJogo');
 };
 
+/* =========================================
+   FUNÇÕES DE INTERFACE (ORDENAR E CHAT)
+   ========================================= */
 
+// Função exata que o HTML procura para ordenar
+window.alternarOrdenacao = function() {
+    socket.emit('jogada', { acao: 'ordenar', dados: {} });
+};
 
+// Função exata que o HTML procura para abrir/fechar o chat
+window.toggleChat = function() {
+    const chat = document.getElementById('janela-chat');
+    if (chat) {
+        chat.style.display = (chat.style.display === 'none' || chat.style.display === '') ? 'flex' : 'none';
+    }
+};
 
+// Função para enviar a mensagem
+window.enviarMensagem = function() {
+    const input = document.getElementById('chat-input');
+    if (input && input.value.trim()) {
+        socket.emit('enviarChat', input.value.trim());
+        input.value = '';
+    }
+};
 
-
-
+// Bônus: Permite enviar mensagem apertando a tecla Enter
+document.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const input = document.getElementById('chat-input');
+        if (input === document.activeElement) {
+            window.enviarMensagem();
+        }
+    }
+});
