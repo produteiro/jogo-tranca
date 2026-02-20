@@ -154,6 +154,16 @@ function atualizarMesa(sala) {
     // ---------------------------------------------------------
 
     renderizarTresVermelhos(sala);    
+    // AUTO-SELEÇÃO DO LIXO: Força a carta do lixo a ficar selecionada na mão
+    if (sala.jogo.obrigacaoTopoLixo && sala.vez === meuIndex && turnoAtivo) {
+        const mao = sala.jogo[`maoJogador${meuIndex + 1}`];
+        const idxObrigacao = mao.findIndex(c => c.id === sala.jogo.obrigacaoTopoLixo);
+        
+        if (idxObrigacao !== -1 && !cartasSelecionadas.includes(idxObrigacao)) {
+            cartasSelecionadas.push(idxObrigacao);
+            atualizarVisualSelecao();
+        }
+    }
 }
 
 // --- ATUALIZAÇÃO VISUAL E ATRIBUIÇÃO DOS CLIQUES ---
@@ -214,9 +224,23 @@ function renderizarMinhaMao(cartas) {
 }
 
 function toggleSelecao(i) {
+    // --- TRAVA VISUAL DO LIXO ---
+    // Impede o jogador de desmarcar a carta obrigatória comprada do lixo
+    if (ultimoEstadoSala && ultimoEstadoSala.jogo && ultimoEstadoSala.jogo.obrigacaoTopoLixo) {
+        const mao = ultimoEstadoSala.jogo[`maoJogador${meuIndex + 1}`];
+        if (mao && mao[i] && mao[i].id === ultimoEstadoSala.jogo.obrigacaoTopoLixo) {
+            if (cartasSelecionadas.includes(i)) {
+                console.log("🔒 Carta obrigatória travada na seleção.");
+                return; // Aborta a função, impedindo a carta de ser desmarcada
+            }
+        }
+    }
+    // ----------------------------
+
     if (cartasSelecionadas.includes(i)) cartasSelecionadas = cartasSelecionadas.filter(x=>x!==i);
     else cartasSelecionadas.push(i);
-    renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]);
+    
+    atualizarVisualSelecao();
 }
 
 function renderizarJogos(idDiv, jogos, ehMeu) {
@@ -496,4 +520,5 @@ document.addEventListener('keypress', function(e) {
         }
     }
 });
+
 
