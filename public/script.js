@@ -1,4 +1,4 @@
-const socket = io();
+Faacconst socket = io();
 let meuIndex = -1;
 let cartasSelecionadas = [];
 let turnoAtivo = false;
@@ -107,7 +107,6 @@ function atualizarMesa(sala) {
     renderizarJogos('jogos-adversarios', sala.jogo.jogosNaMesa[(idEq + 1) % 2], false);
     
     renderizarTresVermelhos(sala);
-    atualizarBotoesAcao(estado);
 }
 
 // --- ATUALIZAÇÃO VISUAL E ATRIBUIÇÃO DOS CLIQUES ---
@@ -171,7 +170,6 @@ function toggleSelecao(i) {
     if (cartasSelecionadas.includes(i)) cartasSelecionadas = cartasSelecionadas.filter(x=>x!==i);
     else cartasSelecionadas.push(i);
     renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]);
-    atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 }
 
 function renderizarJogos(idDiv, jogos, ehMeu) {
@@ -256,26 +254,6 @@ function desenharMaoAdversario(idDiv, qtd) {
     }
 }
 
-function atualizarBotoesAcao(estado) {
-    const btnBaixar = document.getElementById('btn-baixar-jogo');
-    const btnDescartar = document.getElementById('btn-descartar');
-    const btnLimpar = document.getElementById('btn-limpar-selecao');
-    
-    if(!btnBaixar) return;
-    btnBaixar.style.display = 'none';
-    btnDescartar.style.display = 'none';
-    btnLimpar.style.display = 'none';
-    
-    if(!turnoAtivo) return;
-    
-    if(cartasSelecionadas.length > 0) btnLimpar.style.display = 'inline-block';
-    
-    if(estado === 'descartando') {
-        if(cartasSelecionadas.length >= 3) btnBaixar.style.display = 'inline-block';
-        if(cartasSelecionadas.length === 1) btnDescartar.style.display = 'inline-block';
-    }
-}
-
 function atualizarVisualMortos(sala) {
     const divMortos = document.getElementById('area-mortos');
     if (!divMortos) return;
@@ -357,7 +335,6 @@ window.acaoDescartar = function() {
     
     cartasSelecionadas = [];
     ultimaCartaCompradaId = null;
-    atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 };
 
 window.acaoBaixar = function() {
@@ -370,7 +347,7 @@ window.acaoBaixar = function() {
     cartasSelecionadas = [];
 };
 
-window.acaoLimpar = function() { cartasSelecionadas = []; renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]); atualizarBotoesAcao(ultimoEstadoSala.estadoTurno); };
+window.acaoLimpar = function() { cartasSelecionadas = []; renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]);};
 window.acaoOrdenar = function() { socket.emit('jogada', { acao: 'ordenar', dados: {} }); };
 window.pedirReset = function() { if(confirm('Reiniciar?')) socket.emit('resetJogo'); };
 window.fazerLogout = function() { localStorage.removeItem('tranca_sessao'); location.reload(); };
@@ -437,7 +414,6 @@ socket.on('fimDeJogo', (dados) => {
 function atualizarVisualSelecao() {
     if (!ultimoEstadoSala || meuIndex === -1) return;
     renderizarMinhaMao(ultimoEstadoSala.jogo[`maoJogador${meuIndex+1}`]);
-    atualizarBotoesAcao(ultimoEstadoSala.estadoTurno);
 }
 
 window.jogarNovamente = function() {
@@ -446,6 +422,7 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
 
 
 
