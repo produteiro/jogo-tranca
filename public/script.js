@@ -1,4 +1,12 @@
-Faacconst socket = io();
+const socket = io();
+
+// --- SISTEMA DE SESSÃO PERSISTENTE ---
+let meuUid = localStorage.getItem('tranca_uid');
+if (!meuUid) {
+    meuUid = 'usr_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('tranca_uid', meuUid);
+}
+
 let meuIndex = -1;
 let cartasSelecionadas = [];
 let turnoAtivo = false;
@@ -14,14 +22,7 @@ function getImgUrl(c) {
     return `https://deckofcardsapi.com/static/img/${f}${n}.png`;
 }
 
-// --- ESCUTADOR DE ERRO (Crucial para não achar que o jogo travou) ---
-socket.on('erroJogo', (msg) => {
-    alert("❌ AÇÃO INVÁLIDA:\n\n" + msg);
-});
-
-
-// --- RECONEXÃO AUTOMÁTICA E LOGIN ---
-// Ouve toda vez que o socket conecta (seja na primeira vez ou após uma queda de rede)
+// --- ESCUTADORES DO SISTEMA ---
 socket.on('connect', () => {
     console.log("🔌 Conectado/Reconectado ao servidor!");
     const sessao = localStorage.getItem('tranca_sessao');
@@ -29,19 +30,48 @@ socket.on('connect', () => {
         try {
             const user = JSON.parse(sessao);
             if(user && user.nome) {
-                // Refaz o login e o servidor vai te puxar de volta pra mesa ativa!
                 socket.emit('loginAnonimo', { nome: user.nome, uid: meuUid });
             }
         } catch(e) { console.error(e); }
     }
 });
 
-function jogarAnonimo() {
-    const nome = 'Visitante-' + Math.floor(Math.random()*1000);
-    socket.emit('loginAnonimo', nome);
-}
+socket.on('erroJogo', (msg) => { 
+    alert("❌ AÇÃO INVÁLIDA:\n\n" + msg); 
+});
 
-function fazerLogin() { alert("Use o botão jogar como visitante."); }
+// --- FUNÇÕES DE LOGIN E NAVEGAÇÃO ---
+window.jogarAnonimo = function() {
+    const nome = 'Visitante-' + Math.floor(Math.random()*1000);
+    socket.emit('loginAnonimo', { nome: nome, uid: meuUid });
+};
+
+socket.on('loginSucesso', (user) => {
+    localStorage.setItem('tranca_sessao', JSON.stringify(user));
+    document.getElementById('tela-login').style.display = 'none';
+    
+    const emPartidaAtiva = localStorage.getItem('tranca_sala_ativa'); 
+    if (emPartidaAtiva === 'treino') {
+        socket.emit('entrarSala', 'treino');
+        return;
+    }
+    
+    const lobby = document.getElementById('lobby');
+    if(lobby) lobby.style.display = 'flex';
+});
+
+window.entrarModoTreino = function() { 
+    localStorage.setItem('tranca_sala_ativa', 'treino'); 
+    const lobby = document.getElementById('lobby');
+    if(lobby) lobby.style.display = 'none';
+    socket.emit('entrarSala', 'treino'); 
+};
+
+window.fazerLogout = function() { 
+    localStorage.removeItem('tranca_sessao'); 
+    localStorage.removeItem('tranca_sala_ativa'); 
+    location.reload(); 
+};
 function fazerLogout() { localStorage.removeItem('tranca_sessao'); location.reload(); }
 function entrarModoTreino() { socket.emit('entrarSala', 'treino'); }
 function pedirReset() { if(confirm("Reiniciar?")) socket.emit('resetJogo'); }
@@ -439,6 +469,7 @@ window.jogarNovamente = function() {
     meuIndex = -1; turnoAtivo = false; cartasSelecionadas = []; ultimoEstadoSala = null;
     socket.emit('resetJogo');
 };
+
 
 
 
