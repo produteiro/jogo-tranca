@@ -153,69 +153,64 @@ comprarDoMonte: (sala, idx, socket) => {
         broadcastEstado(sala);
     },
 
-    comprarLixo: (sala, idx, indices, socket) => {
-        if (sala.vez !== idx) {
-            if(socket) socket.emit('erroJogo', 'Não é a sua vez de jogar!');
-            return;
-        }
-        if (sala.estadoTurno !== 'comprando') {
-            if(socket) socket.emit('erroJogo', 'Você já comprou. Agora precisa descartar.');
-            return;
-        }
+comprarLixo: (sala, idx, dados, socket) => {
+        if (sala.vez !== idx || sala.estadoTurno !== 'comprando') return;
         if (sala.jogo.lixo.length === 0) return;
-        
-        const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
-        if (cartaTopo.face === '3' && (['paus','espadas'].includes(cartaTopo.naipe))) {
-            if(socket) socket.emit('erroJogo', 'Lixo trancado por um 3 preto!');
-            return;
-        }
 
-        const mao = sala.jogo[`maoJogador${idx + 1}`];
-        const jogosMesa = sala.jogo.jogosNaMesa[idx%2];
+        // 1. Identifica o topo exato
+        const topo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
+        sala.jogo.obrigacaoTopoLixo = topo.id;
         
-        if (verificarPossibilidadeCompra(mao, cartaTopo, jogosMesa)) {
-            const todoLixo = sala.jogo.lixo.splice(0);
-            sala.jogo[`maoJogador${idx + 1}`] = mao.concat(todoLixo);
-            
-            sala.jogo.obrigacaoTopoLixo = cartaTopo.id;
-            
-            higienizarMaoComTresVermelhos(sala, idx);
-            sala.estadoTurno = 'descartando';
-            
-            io.to(sala.id).emit('lixoLimpo'); 
-            io.to(sala.id).emit('statusJogo', { msg: `Jogador ${idx+1} pegou o lixo!` });
-            
-            broadcastEstado(sala);
-        } else {
-            // AQUI ESTÁ O AVISO QUE FALTAVA
-            if(socket) socket.emit('erroJogo', 'Ação Inválida: Para pegar o lixo você precisa justificar a compra tendo pelo menos duas cartas iguais na mão ou encaixando em um jogo na mesa.');
-        }
+        // 2. Identifica e bloqueia temporariamente o "resto" do lixo
+        const restoDoLixo = sala.jogo.lixo.slice(0, sala.jogo.lixo.length - 1);
+        sala.jogo.cartasBloqueadasLixo = restoDoLixo.map(c => c.id);
+
+        sala.jogo[`maoJogador${idx + 1}`].push(...sala.jogo.lixo);
+        sala.jogo.lixo = [];
+        
+        sala.estadoTurno = 'descartando';
+        broadcastEstado(sala);
     },
-
+    
 baixarJogo: (sala, idx, dados, socket) => {
         if (sala.vez !== idx) {
             if(socket) socket.emit('erroJogo', 'Não é a sua vez de jogar!');
             return; 
         }
-
         if (sala.estadoTurno !== 'descartando') {
-            if(socket) socket.emit('erroJogo', 'Ação Inválida: Você precisa comprar do monte ou do lixo ANTES de baixar cartas na mesa!');
+            if(socket) socket.emit('erroJogo', 'Você precisa comprar antes de baixar jogos!');
             return;
         }
 
         const mao = sala.jogo[`maoJogador${idx + 1}`];
-        
-        let cartas = [];
-        if (dados.ids) {
-            cartas = dados.ids.map(id => mao.find(c => c.id === id)).filter(Boolean);
-        } else if (dados.indices) {
-            cartas = dados.indices.map(i => mao[i]).filter(Boolean);
-        }
+        let cartas = dados.ids ? dados.ids.map(id => mao.find(c => c.id === id)).filter(Boolean) : [];
 
-        if (cartas.length === 0) {
-            if(socket) socket.emit('erroJogo', 'Cartas inválidas ou não encontradas.');
-            return;
-        }
+        if (cartas.length === 0) return;
+
+        // --- A MÁQUINA DE ESTADOS DO LIXO ---
+        if (sala.jogo.obrigacaoTopoLixo) {
+            const obId = sala.jogo.obrigacaoTopoLixo;
+            
+            // Regra 1: OBRIGATÓRIO ter a carta exata do topo
+            const usouCartaObrigatoria = cartas.some(c => c.id === obId);
+            if (!usouCartaObrigatoria) {
+                if(socket) socket.emit('erroJogo', 'AÇÃO BLOQUEADA: Você é obrigado a baixar um jogo contendo a carta comprada do topo do lixo primeiro!');
+                return;
+            }
+
+            // Regra 2: PROIBIDO usar o resto do lixo para justificar a compra
+            if (sala.jogo.cartasBloqueadasLixo && sala.jogo.cartasBloqueadasLixo.length > 0) {
+                const tentouUsarLixoBloqueado = cartas.some(c => sala.jogo.cartasBloqueadasLixo.includes(c.id));
+                if (tentouUsarLixoBloqueado) {
+                    if(socket) socket.emit('erroJogo', 'AÇÃO BLOQUEADA: Você não pode usar as outras cartas que vieram no lixo para justificar a compra. Use apenas a carta do topo com as cartas que já estavam com você!');
+                    return;
+                }
+            }
+
+            // Se passou pelas travas, a obrigação foi cumprida com excelência!
+            sala.jogo.obrigacaoTopoLixo = null;
+            sala.jogo.cartasBloqueadasLixo = []; // Libera as outras cartas para uso normal
+        }    
 
         const idEquipe = idx % 2;
         let jogoAlvo = (dados.indexJogoMesa !== null && dados.indexJogoMesa >= 0) 
