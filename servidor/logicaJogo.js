@@ -54,69 +54,64 @@ function embaralhar(array) {
 // ==========================================
 // 🆕 ORDENAÇÃO INTELIGENTE DE JOGOS COM CORINGAS
 // ==========================================
-function ordenarJogoMesa(cartas) {
-    if (!cartas || cartas.length === 0) return [];
-    
-    const coringas = cartas.filter(c => c.face === '2');
-    const normais = cartas.filter(c => c.face !== '2');
+function ordenarJogoMesa(jogo) {
+    if (!jogo || jogo.length <= 1) return jogo;
 
-    if (normais.length === 0) return cartas; 
+    // Tabela de pesos para a matemática dos buracos
+    const valores = { '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
 
-    // Verifica se é trinca ou sequência
-    const faces = [...new Set(normais.map(c => c.face))];
-    
-    // É TRINCA - todas as cartas normais têm a mesma face
-    if (faces.length === 1) {
-        // Coringas vão no final em trincas
-        return [...normais, ...coringas];
+    // Separa os curingas ('2') das cartas normais
+    const curingas = jogo.filter(c => c.face === '2');
+    const normais = jogo.filter(c => c.face !== '2');
+
+    if (normais.length === 0) return jogo; // Proteção para casos bizarros
+
+    // Verifica se é uma TRINCA (todas as normais têm o mesmo número)
+    const ehTrinca = normais.every(c => c.face === normais[0].face);
+    if (ehTrinca) {
+        // Se for trinca, a ordem não importa tanto, o curinga fica elegantemente no final
+        return [...normais, ...curingas];
     }
-    
-    // É SEQUÊNCIA - precisa ordenar e inserir coringas nas posições corretas
-    const naipe = normais[0].naipe;
-    
-    // Ordena cartas normais
-    normais.sort((a, b) => ordemSequencia.indexOf(a.face) - ordemSequencia.indexOf(b.face));
-    
-    // Verifica se tem 2s do mesmo naipe (são naturais, não curingas)
-    const doisDoNaipe = coringas.filter(c => c.naipe === naipe);
-    const curingasOutros = coringas.filter(c => c.naipe !== naipe);
-    
-    // Se tem 2s do naipe, adiciona eles como cartas naturais
-    if (doisDoNaipe.length > 0) {
-        doisDoNaipe.forEach(dois => normais.push(dois));
-        normais.sort((a, b) => ordemSequencia.indexOf(a.face) - ordemSequencia.indexOf(b.face));
-    }
-    
-    // Se não tem curingas de outros naipes, retorna ordenado
-    if (curingasOutros.length === 0) {
-        return normais;
-    }
-    
-    // Insere curingas nas posições dos buracos
-    const resultado = [];
-    let curingaIndex = 0;
-    
-    for (let i = 0; i < normais.length; i++) {
-        resultado.push(normais[i]);
-        
-        if (i < normais.length - 1 && curingaIndex < curingasOutros.length) {
-            const idxAtual = ordemSequencia.indexOf(normais[i].face);
-            const idxProx = ordemSequencia.indexOf(normais[i + 1].face);
-            
-            // Se tem buraco, insere coringa
-            if (idxProx - idxAtual > 1) {
-                resultado.push(curingasOutros[curingaIndex]);
-                curingaIndex++;
-            }
+
+    // Se é SEQUÊNCIA, primeiro ordenamos perfeitamente as cartas normais
+    normais.sort((a, b) => valores[a.face] - valores[b.face]);
+
+    if (curingas.length === 0) return normais;
+
+    let resultado = [];
+    let curingasUsados = 0;
+
+    resultado.push(normais[0]);
+
+    // O "Scanner de Buracos": Percorre a sequência procurando falhas numéricas
+    for (let i = 1; i < normais.length; i++) {
+        let valorAtual = valores[normais[i].face];
+        let valorAnterior = valores[normais[i - 1].face];
+        let diferenca = valorAtual - valorAnterior;
+
+        // Encontrou um buraco! Insere o curinga exatamente no espaço vazio
+        while (diferenca > 1 && curingasUsados < curingas.length) {
+            resultado.push(curingas[curingasUsados]);
+            curingasUsados++;
+            diferenca--;
         }
+        resultado.push(normais[i]);
     }
-    
-    // Se ainda tem curingas sobrando, coloca no início (para sequências que começam antes)
-    while (curingaIndex < curingasOutros.length) {
-        resultado.unshift(curingasOutros[curingaIndex]);
-        curingaIndex++;
+
+    // Se não havia buraco (ex: baixou [4, 5, 6, 2]), joga o curinga para as pontas
+    while (curingasUsados < curingas.length) {
+        let ultimaCarta = resultado[resultado.length - 1];
+        
+        // Se não bateu no teto (Ás = 14), o curinga finge ser a próxima carta maior (vai pro topo)
+        if (ultimaCarta && ultimaCarta.face !== '2' && valores[ultimaCarta.face] < 14) {
+            resultado.push(curingas[curingasUsados]);
+        } else {
+            // Se já tem um Ás no topo, o curinga finge ser a carta menor (vai pra base)
+            resultado.unshift(curingas[curingasUsados]);
+        }
+        curingasUsados++;
     }
-    
+
     return resultado;
 }
 
@@ -500,6 +495,7 @@ function encontrarSequencias(mao) {
     encontrarTrincas, encontrarSequencias,
     gerarIdCarta  // ✅ Exporta a função
 };
+
 
 
 
