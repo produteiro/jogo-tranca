@@ -159,12 +159,18 @@ comprarLixo: (sala, idx, dados, socket) => {
 
         // 1. Identifica o topo exato
         const topo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
-        sala.jogo.obrigacaoTopoLixo = topo.id;
         
-        // 2. Identifica e bloqueia temporariamente o "resto" do lixo
-        const restoDoLixo = sala.jogo.lixo.slice(0, sala.jogo.lixo.length - 1);
-        sala.jogo.cartasBloqueadasLixo = restoDoLixo.map(c => c.id);
+        // 2. A MÁGICA: Só impõe a regra de "clique obrigatório na ordem certa" 
+        // se a jogada vier de um jogador humano (ou seja, se o socket existir)
+        if (socket) {
+            sala.jogo.obrigacaoTopoLixo = topo.id;
+            
+            // Bloqueia temporariamente o "resto" do lixo para o humano
+            const restoDoLixo = sala.jogo.lixo.slice(0, sala.jogo.lixo.length - 1);
+            sala.jogo.cartasBloqueadasLixo = restoDoLixo.map(c => c.id);
+        }
 
+        // Entrega as cartas para a mão do jogador (ou Bot)
         sala.jogo[`maoJogador${idx + 1}`].push(...sala.jogo.lixo);
         sala.jogo.lixo = [];
         
@@ -623,6 +629,7 @@ socket.on('jogada', (dados) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`Rodando na porta ${PORT}`));
+
 
 
 
