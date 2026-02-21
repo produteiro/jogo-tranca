@@ -297,7 +297,7 @@ html, body {
     height: 112px; 
     /* A MÁGICA DO ESPAÇO: Aumentamos o valor negativo para esconder mais a carta.
        Como a carta tem 80px, -60px deixa exatamente 20px visíveis (só o número e naipe) */
-    margin-right: -60px; 
+    margin-right: -70px; 
     
     box-shadow: -2px 0 5px rgba(0,0,0,0.5); /* Sombra para a esquerda ajuda a destacar o corte */
     transition: margin 0.2s ease-in-out;
@@ -426,6 +426,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
