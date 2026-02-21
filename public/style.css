@@ -358,7 +358,8 @@ button:active { transform: translateY(2px); box-shadow: none; }
 
 #minha-mao .carta {
     width: 80px; height: 112px;
-    margin-right: -60px; /* Ajuste este valor (ex: -55px, -65px) conforme a largura real da sua carta para mostrar só o naipe */    box-shadow: -2px 0 6px rgba(0,0,0,0.5);
+    margin-right: -74px; /* Ajuste este valor (ex: -55px, -65px) conforme a largura real da sua carta para mostrar só o naipe */    
+    //box-shadow: -2px 0 6px rgba(0,0,0,0.5);
     transition: transform 0.2s, margin 0.2s;
     cursor: pointer;
     border-radius: 6px;
@@ -487,4 +488,5 @@ button:active { transform: translateY(2px); box-shadow: none; }
         transform-origin: center right;
     }
 }
+
 
