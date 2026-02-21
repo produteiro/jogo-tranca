@@ -378,9 +378,21 @@ button:active { transform: translateY(2px); box-shadow: none; }
    8. FERRAMENTAS E MODAIS
    ========================================= */
 #barra-ferramentas {
-    position: fixed; bottom: 20px; right: 20px;
-    display: flex; flex-direction: column; gap: 10px; z-index: 200;
+    position: fixed; /* Mantém os botões sempre visíveis na tela */
+    bottom: 220px;   /* A MÁGICA: Empurra os botões para cima (ajuste esse valor se precisar de mais espaço) */
+    right: 20px;     /* Cola na margem direita */
+    display: flex;
+    flex-direction: column; /* Empilha os botões verticalmente (um em cima do outro) */
+    gap: 15px;       /* Espaço entre um botão e outro */
+    z-index: 90;     /* Garante que fiquem por cima da mesa, mas abaixo de modais */
 }
+
+#barra-ferramentas button:hover {
+    background: rgba(241, 196, 15, 0.9); /* Dourado ao passar o mouse */
+    color: #000;
+    transform: scale(1.1);
+}
+
 .btn-icone {
     width: 50px; height: 50px; background: #222; border: 2px solid #444;
     border-radius: 50%; display: flex; justify-content: center; align-items: center;
@@ -426,6 +438,7 @@ button:active { transform: translateY(2px); box-shadow: none; }
         margin-right: -35px;
     }
 }
+
 
 
 
