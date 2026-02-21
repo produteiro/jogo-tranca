@@ -439,17 +439,51 @@ button:active { transform: translateY(2px); box-shadow: none; }
     }
 }
 
+/* =========================================
+   RESPONSIVIDADE: BARRA SUPERIOR (MOBILE)
+   ========================================= */
 
+@media (max-width: 768px) {
+    /* 1. Trava a largura da barra superior para não estourar a tela */
+    /* ATENÇÃO: Se o ID da sua barra superior for diferente, altere aqui (ex: #painel-superior, header, etc) */
+    #cabecalho, .barra-superior { 
+        width: 100vw !important;
+        max-width: 100vw !important;
+        box-sizing: border-box;
+        padding: 5px;
+        display: flex;
+        flex-wrap: nowrap; /* Força tudo a ficar na mesma linha */
+        justify-content: space-between;
+        align-items: center;
+        gap: 2px;
+        overflow: hidden; /* Corta qualquer coisa que tentar vazar */
+    }
 
+    /* 2. Encolhe agressivamente os 3 Vermelhos e sobrepõe as cartas */
+    #tres-vermelhos-nos, #tres-vermelhos-eles {
+        display: flex;
+        flex-shrink: 1;
+        min-width: 0;
+    }
+    .carta-mini-header img {
+        width: 16px !important; /* Tamanho bem reduzido para celular */
+        height: auto;
+        margin-right: -8px; /* Sobrepõe os 3 vermelhos para economizar muito espaço */
+    }
+    .carta-mini-header:last-child img {
+        margin-right: 0;
+    }
 
+    /* 3. Reduz as fontes do placar e dos status */
+    #pts-nos, #pts-eles, #info-jogo {
+        font-size: 11px !important;
+        white-space: nowrap; /* Impede a quebra de texto */
+        flex-shrink: 1;      /* Permite espremer se necessário */
+    }
 
-
-
-
-
-
-
-
-
-
-
+    /* 4. Encolhe a área que mostra as cartas na mão do adversário */
+    .mao-adversario {
+        transform: scale(0.7); /* Reduz visualmente o tamanho das costas das cartas do adversário */
+        transform-origin: center right;
+    }
+}
