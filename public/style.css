@@ -445,9 +445,8 @@ button:active { transform: translateY(2px); box-shadow: none; }
    ========================================= */
 
 @media (max-width: 768px) {
-    /* 1. Trava a largura da barra superior para não estourar a tela */
-    /* ATENÇÃO: Se o ID da sua barra superior for diferente, altere aqui (ex: #painel-superior, header, etc) */
-    #cabecalho, .barra-superior { 
+    /* 1. O ID correto: Trava a largura da barra superior */
+    #game-header { 
         width: 100vw !important;
         max-width: 100vw !important;
         box-sizing: border-box;
@@ -460,34 +459,48 @@ button:active { transform: translateY(2px); box-shadow: none; }
         overflow: hidden; /* Corta qualquer coisa que tentar vazar */
     }
 
-    /* 2. Encolhe agressivamente os 3 Vermelhos e sobrepõe as cartas */
+    /* 2. Oculta botões de texto no cabeçalho (Sair/Reiniciar) para liberar espaço */
+    #game-header button {
+        display: none !important;
+    }
+
+    /* 3. Reduz a logo e o placar para não esmagarem as cartas */
+    #game-header .logo {
+        font-size: 14px !important;
+        letter-spacing: 0;
+    }
+    
+    #placar-integrado {
+        padding: 2px 8px !important;
+        gap: 10px !important;
+        transform: scale(0.85); /* Encolhe o placar todo proporcionalmente */
+        transform-origin: center;
+    }
+
+    /* 4. Encolhe agressivamente os 3 Vermelhos e sobrepõe as cartas */
     #tres-vermelhos-nos, #tres-vermelhos-eles {
         display: flex;
         flex-shrink: 1;
         min-width: 0;
     }
-    .carta-mini-header img {
+    .carta-mini-header {
         width: 16px !important; /* Tamanho bem reduzido para celular */
-        height: auto;
-        margin-right: -8px; /* Sobrepõe os 3 vermelhos para economizar muito espaço */
+        height: 24px !important;
+        margin-right: -8px !important; /* Sobrepõe os 3 vermelhos */
     }
-    .carta-mini-header:last-child img {
-        margin-right: 0;
-    }
-
-    /* 3. Reduz as fontes do placar e dos status */
-    #pts-nos, #pts-eles, #info-jogo {
-        font-size: 11px !important;
-        white-space: nowrap; /* Impede a quebra de texto */
-        flex-shrink: 1;      /* Permite espremer se necessário */
+    .carta-mini-header:last-child {
+        margin-right: 0 !important;
     }
 
-    /* 4. Encolhe a área que mostra as cartas na mão do adversário */
+    /* 5. Reduz as fontes dos status */
+    #info-jogo {
+        font-size: 10px !important;
+        white-space: nowrap; 
+    }
+
+    /* 6. Encolhe a área que mostra as cartas na mão do adversário */
     .mao-adversario {
-        transform: scale(0.7); /* Reduz visualmente o tamanho das costas das cartas do adversário */
+        transform: scale(0.7); 
         transform-origin: center right;
     }
 }
-
-
-
