@@ -5,8 +5,7 @@ function vaiserTravaDeMao(sala, idEquipe, qtdCartasGastas, maoTotal) {
     const jaPegouMorto = sala.jogo.equipePegouMorto[idEquipe];
     const temCanastraFechada = temCanastra(sala.jogo.jogosNaMesa[idEquipe]);
     
-    // Se tem obrigação, IGNORA TRAVA. É melhor ficar com 0 cartas e tomar penalidade 
-    // (ou depender da sorte) do que travar o jogo.
+    // Se tem obrigação do lixo, ele não tem escolha a não ser baixar o jogo
     if (sala.jogo.obrigacaoTopoLixo) return false;
 
     if (!jaPegouMorto) return false; 
@@ -16,9 +15,9 @@ function vaiserTravaDeMao(sala, idEquipe, qtdCartasGastas, maoTotal) {
     return sobras < 2;
 }
 
-// Simula se a carta do topo serve e RETORNA O PLANO DE JOGO (IDs das cartas)
+// REGRA DA VIDÊNCIA: Simula se a carta do topo serve e RETORNA OS IDs EXATOS
 function planejarJogadaLixo(mao, cartaTopo, jogosMesa) {
-    // 1. Serve na Mesa?
+    // 1. O topo encaixa perfeitamente em um jogo que já está na mesa?
     if (jogosMesa) {
         for (let i = 0; i < jogosMesa.length; i++) {
             if (verificarSeEncaixa(jogosMesa[i], cartaTopo)) {
@@ -27,35 +26,33 @@ function planejarJogadaLixo(mao, cartaTopo, jogosMesa) {
         }
     }
 
-    // 2. Serve na Mão? (Simula mão com a carta)
+    // 2. O topo forma um jogo novo na mão? (Simulando a mão)
     const maoSimulada = [...mao, cartaTopo];
     
-    // Procura Trincas que usem o Topo
+    // Procura Trincas
     const trincas = encontrarTrincas(maoSimulada);
     for (let indices of trincas) {
         const cartasJogo = indices.map(i => maoSimulada[i]);
+        // Verifica se a carta do topo faz parte desta trinca encontrada
         if (cartasJogo.some(c => c.id === cartaTopo.id)) {
-            return { tipo: 'novo', ids: cartasJogo.map(c => c.id) };
+            return { tipo: 'novo', ids: cartasJogo.map(c => c.id), mesaIdx: null };
         }
     }
 
-    // Procura Sequências que usem o Topo
+    // Procura Sequências
     const sequencias = encontrarSequencias(maoSimulada);
     for (let indices of sequencias) {
         const cartasJogo = indices.map(i => maoSimulada[i]);
         if (cartasJogo.some(c => c.id === cartaTopo.id)) {
-            return { tipo: 'novo', ids: cartasJogo.map(c => c.id) };
+            return { tipo: 'novo', ids: cartasJogo.map(c => c.id), mesaIdx: null };
         }
     }
 
-    return null; // Não serve
+    return null; // A vidência diz que não tem jogo. O Bot é proibido de comprar o lixo.
 }
 
 function jogarTurnoBot(sala, indiceBot, funcoes) {
     console.log(`[BOT ${indiceBot}] Iniciando turno...`);
-    
-    // Variável para persistir o plano entre o passo de Compra e o passo de Baixar
-    // O bot não tem memória persistente entre chamadas de função, mas dentro do escopo do turno (closures) sim.
     let planoObrigatorio = null;
 
     // --- ETAPA 1: COMPRAR ---
@@ -63,130 +60,89 @@ function jogarTurnoBot(sala, indiceBot, funcoes) {
         try {
             const maoInicial = sala.jogo[`maoJogador${indiceBot + 1}`];
             const idEquipe = indiceBot % 2;
-            let moveuDoLixo = false;
+            let comprouLixo = false;
 
             if (sala.jogo.lixo.length > 0) {
                 const cartaTopo = sala.jogo.lixo[sala.jogo.lixo.length - 1];
                 const trancado = cartaTopo.face === '3' && (cartaTopo.naipe === 'paus' || cartaTopo.naipe === 'espadas');
 
                 if (!trancado) {
-                    // PLANEJA A JOGADA ANTES DE COMPRAR
+                    // O Bot planeja a jogada antes de tocar no lixo
                     const plano = planejarJogadaLixo(maoInicial, cartaTopo, sala.jogo.jogosNaMesa[idEquipe]);
 
                     if (plano) {
-                        // Se tem plano, compra!
-                        console.log(`[BOT ${indiceBot}] Plano Lixo: ${plano.tipo} com ids [${plano.ids}]`);
-                        planoObrigatorio = plano; // Salva para o próximo passo
+                        console.log(`[BOT ${indiceBot}] A vidência funcionou. Comprando Lixo com plano. IDs: [${plano.ids}]`);
+                        planoObrigatorio = plano; 
                         funcoes.comprarLixo(sala, indiceBot, [], null);
-                        moveuDoLixo = true;
+                        comprouLixo = true;
                     }
                 }
             }
 
-            if (!moveuDoLixo) {
+            if (!comprouLixo) {
                 funcoes.comprarDoMonte(sala, indiceBot, null);
             }
 
-        } catch (e) {
-            console.error(`Erro Bot Compra:`, e);
-            funcoes.comprarDoMonte(sala, indiceBot, null); 
-        }
+        } catch (e) { console.error(`Erro Bot Compra:`, e); }
 
         // --- ETAPA 2: BAIXAR JOGOS ---
         setTimeout(() => {
             try {
-                // Pega a mão ATUALIZADA (O servidor já adicionou o lixo e REORDENOU a mão)
-                const mao = sala.jogo[`maoJogador${indiceBot + 1}`];
                 const idEquipe = indiceBot % 2;
-                let jogouAlgo = false;
 
-                // 1. EXECUTA O PLANO OBRIGATÓRIO (SE HOUVER)
-                if (planoObrigatorio) {
-                    console.log(`[BOT ${indiceBot}] Executando plano obrigatório...`);
-                    
-                    // Precisamos encontrar os NOVOS índices das cartas baseados nos IDs
-                    const indicesParaJogar = [];
-                    let encontrouTodas = true;
-
-                    planoObrigatorio.ids.forEach(idBusca => {
-                        const idx = mao.findIndex(c => c.id === idBusca);
-                        if (idx !== -1) indicesParaJogar.push(idx);
-                        else encontrouTodas = false;
-                    });
-
-                    if (encontrouTodas) {
-                        const idxMesa = (planoObrigatorio.tipo === 'mesa') ? planoObrigatorio.mesaIdx : null;
-                        
-                        // Executa sem verificar travas (é obrigação)
-                        funcoes.baixarJogo(sala, indiceBot, { indices: indicesParaJogar, indexJogoMesa: idxMesa }, null);
-                        jogouAlgo = true;
-                        
-                        // Zera o plano para não repetir
-                        planoObrigatorio = null; 
-                    } else {
-                        console.error(`[BOT ${indiceBot}] ERRO CRÍTICO: Cartas do plano sumiram da mão!`);
-                        // Fallback: Tenta achar qualquer jogo com a obrigação
-                    }
+                // 1. PRIORIDADE ABSOLUTA: CUMPRIR LIXO (SE COMPROU)
+                if (sala.jogo.obrigacaoTopoLixo && planoObrigatorio) {
+                    console.log(`[BOT ${indiceBot}] Executando o plano do Lixo com prioridade absoluta.`);
+                    // O Bot agora envia os IDs EXATOS, como o servidor humano exige
+                    funcoes.baixarJogo(sala, indiceBot, { 
+                        ids: planoObrigatorio.ids, 
+                        indexJogoMesa: planoObrigatorio.mesaIdx 
+                    }, null);
+                } 
+                else if (sala.jogo.obrigacaoTopoLixo) {
+                    console.warn(`[BOT ${indiceBot}] Erro Crítico: Tem obrigação, mas o plano sumiu!`);
                 }
 
-                // Se ainda tiver obrigação pendente (ex: plano falhou), tenta qualquer coisa com a carta
-                if (sala.jogo.obrigacaoTopoLixo && !jogouAlgo) {
-                    const cartaObrigacao = mao.find(c => c.id === sala.jogo.obrigacaoTopoLixo);
-                    if (cartaObrigacao) {
-                        // Tenta achar na mesa
-                        const jogosMesa = sala.jogo.jogosNaMesa[idEquipe];
-                        const idxMesa = jogosMesa.findIndex(j => verificarSeEncaixa(j, cartaObrigacao));
-                        if(idxMesa !== -1) {
-                             const idxMao = mao.findIndex(c => c.id === cartaObrigacao.id);
-                             funcoes.baixarJogo(sala, indiceBot, { indices: [idxMao], indexJogoMesa: idxMesa }, null);
-                             jogouAlgo = true;
-                        }
-                        // Tenta achar jogo novo (Recalcula)
-                        // ... (Código de fallback simplificado omitido para não duplicar lógica, o plano acima deve cobrir 99%)
-                    }
-                }
-
-                // 2. JOGADAS NORMAIS (Se não jogou ou se tem mais cartas)
-                // Só continua se não tiver risco de travar a mão e se já cumpriu obrigações
+                // 2. JOGADAS NORMAIS LIVRES (Apenas se a obrigação do lixo não existir mais)
+                // Atualiza a mão pois a jogada anterior pode ter removido cartas
+                const maoAtualizada = sala.jogo[`maoJogador${indiceBot + 1}`];
+                
                 if (!sala.jogo.obrigacaoTopoLixo) {
-                    // A) Jogos Novos
-                    const trincas = encontrarTrincas(mao);
-                    const sequencias = encontrarSequencias(mao);
+                    const trincas = encontrarTrincas(maoAtualizada);
+                    const sequencias = encontrarSequencias(maoAtualizada);
                     let novosJogos = [...trincas, ...sequencias];
 
                     if (novosJogos.length > 0) {
-                        novosJogos.sort((a, b) => b.length - a.length);
-                        const jogoParaBaixar = novosJogos[0];
-                        if (!vaiserTravaDeMao(sala, idEquipe, jogoParaBaixar.length, mao.length)) {
-                            funcoes.baixarJogo(sala, indiceBot, { indices: jogoParaBaixar, indexJogoMesa: null }, null);
+                        novosJogos.sort((a, b) => b.length - a.length); // Tenta o maior jogo primeiro
+                        const jogoParaBaixar = novosJogos[0]; // Isso aqui é um array de índices
+                        
+                        if (!vaiserTravaDeMao(sala, idEquipe, jogoParaBaixar.length, maoAtualizada.length)) {
+                            // A CORREÇÃO MÁGICA: Converte os índices encontrados em IDs antes de mandar para o servidor
+                            const idsParaBaixar = jogoParaBaixar.map(i => maoAtualizada[i].id);
+                            
+                            console.log(`[BOT ${indiceBot}] Baixando jogo normal livre da mão.`);
+                            funcoes.baixarJogo(sala, indiceBot, { ids: idsParaBaixar, indexJogoMesa: null }, null);
                         }
                     }
-                    
-                    // B) Completar Mesa (Se ainda não jogou nada neste turno ou quer jogar mais)
-                    // ... (Simplificado: Bot joga 1 vez por turno para ser seguro e rápido)
                 }
 
-            } catch (e) {
-                console.error(`Erro Bot Baixar:`, e);
-            }
+            } catch (e) { console.error(`Erro Bot Baixar:`, e); }
 
             // --- ETAPA 3: DESCARTAR ---
             setTimeout(() => {
                 try {
                     const maoFinal = sala.jogo[`maoJogador${indiceBot + 1}`];
                     
-                    // SEGURANÇA FINAL: Se ainda tem obrigação, NÃO DESCARTA.
+                    // SEGURANÇA FINAL: Se por um milagre ele ainda tem obrigação, ele é proibido de descartar
                     if (sala.jogo.obrigacaoTopoLixo) {
-                        console.log(`[BOT ${indiceBot}] Travado com obrigação. Turno perdido (timeout natural).`);
+                        console.log(`[BOT ${indiceBot}] Bloqueado pela obrigação. Turno pulado.`);
                         return;
                     }
 
                     if (maoFinal && maoFinal.length > 0) {
                         realizarDescarteInteligente(sala, indiceBot, funcoes, maoFinal);
                     }
-                } catch (e) {
-                    console.error(`Erro Bot Descarte:`, e);
-                }
+                } catch (e) { console.error(`Erro Bot Descarte:`, e); }
             }, 1500);
 
         }, 1500);
