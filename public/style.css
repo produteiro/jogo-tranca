@@ -297,7 +297,7 @@ html, body {
     height: 112px; 
     /* A MÁGICA DO ESPAÇO: Aumentamos o valor negativo para esconder mais a carta.
        Como a carta tem 80px, -60px deixa exatamente 20px visíveis (só o número e naipe) */
-    margin-right: -74px; 
+    margin-right: -68px; 
     
     box-shadow: -2px 0 5px rgba(0,0,0,0.5); /* Sombra para a esquerda ajuda a destacar o corte */
     transition: margin 0.2s ease-in-out;
@@ -430,8 +430,8 @@ button:active { transform: translateY(2px); box-shadow: none; }
 
 @media (max-width: 768px) {
     /* No mobile, aumenta o espaço para garantir que não haja sobreposição */
-    #jogos-adversarios { margin-top: 100px; padding: 0 10px; gap: 15px; }
-    .faixa-central { margin-top: 60px; gap: 20px; transform: scale(0.9); }
+   #jogos-adversarios { margin-top: 100px; padding: 0 10px; gap: 15px; }    
+   .faixa-central { margin-top: 60px; gap: 20px; transform: scale(0.9); }
     
     /* Cartas menores para caber na tela do celular */
     .grupo-baixado .carta, #minha-mao .carta, #monte, #lixo, #carta-lixo .carta {
@@ -503,4 +503,17 @@ button:active { transform: translateY(2px); box-shadow: none; }
         transform: scale(0.7); 
         transform-origin: center right;
     }
+   /* A MÁGICA NO MOBILE: Sobreposição extrema para a sua mão e jogos baixados */
+    .grupo-baixado .carta, #minha-mao .carta {
+        width: 60px; 
+        height: 84px;
+        /* Como a carta tem 60px, -45px deixa apenas 15px visíveis (exatamente o naipe e valor) */
+        margin-right: -45px !important; 
+    }
+
+    /* Garante que a última carta de cada jogo/mão fica 100% visível no mobile */
+    .grupo-baixado .carta:last-child, #minha-mao .carta:last-child {
+        margin-right: 0 !important;
+    }
 }
+
